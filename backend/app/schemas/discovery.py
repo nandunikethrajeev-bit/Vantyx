@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---------------- Creator Schemas ----------------
@@ -42,8 +42,7 @@ class CreatorResponse(CreatorBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------------- Rights Record Schemas ----------------
@@ -83,8 +82,7 @@ class RightsRecordResponse(RightsRecordBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------------- Video Source Schemas ----------------
@@ -116,8 +114,7 @@ class VideoSourceResponse(VideoSourceBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------------- Operation Results ----------------

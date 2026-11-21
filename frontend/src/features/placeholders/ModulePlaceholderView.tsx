@@ -43,6 +43,17 @@ const MODULE_DETAILS: Record<
       'Candidate moment metadata synthesis',
     ],
   },
+  selection: {
+    name: 'Selection Module',
+    milestone: 'Milestone 04',
+    description: 'Intelligent candidate clip scoring and non-overlapping ranking.',
+    plannedResponsibilities: [
+      'Hook strength and retention curve scoring',
+      'Narrative context completeness evaluation',
+      'Timestamp overlap resolution',
+      'Daily 4-Shorts quota target management',
+    ],
+  },
   production: {
     name: 'Production Module',
     milestone: 'Milestone 05',

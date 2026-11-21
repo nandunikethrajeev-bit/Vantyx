@@ -24,6 +24,10 @@ const SECTION_TITLES: Record<NavigationSection, { title: string; subtitle: strin
     title: 'Media Intelligence',
     subtitle: 'Multimodal analysis and semantic scene indexing (Milestone 03)',
   },
+  selection: {
+    title: 'Clip Selection',
+    subtitle: 'Intelligent moment scoring and 4-daily Shorts ranking (Milestone 04)',
+  },
   production: {
     title: 'Shorts Production',
     subtitle: 'Dynamic 9:16 vertical re-framing and composition (Milestone 05)',

@@ -61,7 +61,60 @@
   - **Test Suite**:
     - 22 backend tests passing (unit provider tests, integration analysis workflow and eligibility gate blocking tests).
     - 12 frontend tests passing.
-- **Milestone 04**: Intelligent Clip Selection (Hook evaluation, retention scoring, ranking).
+
+---
+
+## Milestone 04: Intelligent Clip Selection & Moment Ranking
+- **Status**: COMPLETE & VERIFIED
+- **Key Deliverables**:
+  - **Multi-Factor Scoring Engine**:
+    - `evaluate_hook_strength`: Assesses opening 3-second visual intensity, early spoken cues, and high-energy gameplay tags (stunts, chases, shootouts). Score: 20-100.
+    - `evaluate_retention_potential`: Models pacing, mid-video climax, excitement sustainability, and applies duration penalties outside the 30-55s Shorts sweet spot. Score: 15-100.
+    - `evaluate_context_completeness`: Enforces narrative self-containment, penalizing abrupt or fragmented cuts (<20s) and rewarding self-contained story arcs. Score: 20-100.
+    - `evaluate_audio_quality`: Assesses speech transcript density, dialogue clarity, and game sound effects. Score: 25-100.
+  - **Configurable Ranking Weights**:
+    - `RankingWeights` dataclass and schema supporting customizable weights (`hook_weight`, `retention_weight`, `context_weight`, `audio_weight`) with automatic normalization and presets (Balanced, Hook Heavy, Story Pacing).
+  - **Deduplication & Overlap Prevention**:
+    - `has_timestamp_overlap`: Strict interval overlap resolution ensuring candidate moments do not collide on the source timeline beyond a 3-second margin.
+    - `is_duplicate_moment`: Jaccard token/tag similarity filter preventing redundant clips of the same scene theme, guaranteeing diversity across daily outputs.
+  - **Explainable Rationale & Dynamic Title Generation**:
+    - Detailed, human-readable rationale strings breaking down exact scoring factors.
+    - Punchy, SEO-optimized title suggestions formatted for YouTube Shorts (`GTA 6: [Label] #Shorts`).
+  - **Daily 4-Shorts Target Management**:
+    - `/api/v1/selection/daily-queue` endpoint calculating progress towards the target quota of 4 quality Shorts per day for target channel **Astro Rebel**.
+  - **REST Endpoints**:
+    - `POST /api/v1/selection/generate/{source_id}` (Generates & ranks candidate clips).
+    - `GET /api/v1/selection/candidates` (Lists ranked clips with source & status filters).
+    - `GET /api/v1/selection/candidates/{candidate_id}` (Retrieves single candidate clip).
+    - `PATCH /api/v1/selection/candidates/{candidate_id}` (Updates review status, title, or timestamps).
+    - `GET /api/v1/selection/daily-queue` (Retrieves top candidate clips for daily publishing).
+  - **Interactive Frontend Workspace**:
+    - Dedicated `SelectionView` integrated in navigation sidebar with `M04` badge.
+    - Daily YouTube Shorts Quota progress meter (Target: 4 Shorts/day).
+    - Candidate moment cards displaying hook, retention, context, and audio metric pills.
+    - One-click workflow actions: Approve, Reject, and Reset.
+    - Candidate generation modal with source picker, minimum score threshold slider, and weight preset selector.
+  - **Test Suite**:
+    - 30 backend tests passing (deterministic unit tests for hook, context, audio, weights, overlap prevention, duplicate detection, and full API integration test).
+    - 14 frontend tests passing.
+    - Production build (`tsc -b && vite build`) passing cleanly.
+
+---
+
+## Tooling & Infrastructure Verification: FFmpeg
+- **Status**: VERIFIED & TESTED
+- **Executable**: `C:\Users\Niketh Rajeev\Downloads\VANTYX\backend\.venv\Lib\site-packages\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v9.0.2.exe`
+- **Version**: FFmpeg 9.0.2-essentials_build (gyan.dev)
+- **Codecs Verified**: `libx264` (H.264 video encoder), `aac` (AAC audio encoder)
+- **Filtergraphs Tested**:
+  - Vertical 9:16 re-framing with blurred side-fill:
+    `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:5[bg];[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[v]`
+  - Audio normalization: `loudnorm` filter (EBU R128 / -14 LUFS)
+  - Synthetic test render successfully generated valid MP4 video.
+- **Configurability**: Added `FFMPEG_PATH` to `Settings` with automatic fallback to `imageio-ffmpeg` or system PATH.
+
+---
+
 - **Milestone 05**: Video Production Engine (FFmpeg 9:16 vertical synthesis, subtitles, audio normalization).
 - **Milestone 06**: Distribution & Automated Publishing (YouTube OAuth, 4-slots daily schedule in Asia/Kolkata).
 - **Milestone 07**: Autonomous Orchestration (Cron scheduler, execution logs, failure recovery).

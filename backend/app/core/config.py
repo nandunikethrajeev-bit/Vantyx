@@ -8,7 +8,7 @@ Supports both PostgreSQL (production/docker) and resilient local SQLite fallback
 import os
 import socket
 from pathlib import Path
-from typing import List, Union
+from typing import List, Optional, Union
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -92,6 +92,29 @@ class Settings(BaseSettings):
     PRIMARY_CHANNEL_NAME: str = Field(default="Astro Rebel", description="Target YouTube publishing channel")
     TARGET_SHORTS_PER_DAY: int = Field(default=4, description="Target daily scheduled shorts count")
     TIMEZONE: str = Field(default="Asia/Kolkata", description="Platform primary scheduling timezone")
+
+    # Media & Rendering Tools
+    FFMPEG_PATH: Optional[str] = Field(
+        default=None,
+        description="Explicit path to ffmpeg binary. If None, resolves via imageio-ffmpeg or system PATH.",
+    )
+
+    def get_ffmpeg_executable(self) -> str:
+        """Resolve the active FFmpeg binary path across local and cloud environments."""
+        if self.FFMPEG_PATH and os.path.exists(self.FFMPEG_PATH):
+            return self.FFMPEG_PATH
+        try:
+            import imageio_ffmpeg
+            exe = imageio_ffmpeg.get_ffmpeg_exe()
+            if os.path.exists(exe):
+                return exe
+        except Exception:
+            pass
+        import shutil
+        sys_ffmpeg = shutil.which("ffmpeg")
+        if sys_ffmpeg:
+            return sys_ffmpeg
+        raise RuntimeError("FFmpeg executable not found. Ensure imageio-ffmpeg is installed or set FFMPEG_PATH.")
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

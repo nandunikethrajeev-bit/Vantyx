@@ -20,6 +20,8 @@ class CandidateClip(Base, TimestampMixin):
     title_suggestion: Mapped[str] = mapped_column(String(255), nullable=False)
     hook_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)        # 0.0 - 100.0
     retention_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)   # 0.0 - 100.0
+    context_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)     # 0.0 - 100.0
+    audio_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)       # 0.0 - 100.0
     overall_score: Mapped[float] = mapped_column(Float, default=0.0, index=True, nullable=False)
     status: Mapped[str] = mapped_column(
         String(32), default="candidate", index=True, nullable=False

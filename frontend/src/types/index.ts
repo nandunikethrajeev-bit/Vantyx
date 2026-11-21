@@ -2,6 +2,7 @@ export type NavigationSection =
   | 'overview'
   | 'discovery'
   | 'intelligence'
+  | 'selection'
   | 'production'
   | 'distribution'
   | 'analytics'
@@ -121,4 +122,40 @@ export interface AnalysisJob {
   scenes: VideoScene[];
   created_at: string;
   updated_at: string;
+}
+
+// ---------------- Selection & Moment Ranking ----------------
+
+export interface CandidateClip {
+  id: number;
+  source_id: number;
+  scene_id?: number | null;
+  start_time: number;
+  end_time: number;
+  duration_seconds: number;
+  title_suggestion: string;
+  hook_score: number;
+  retention_score: number;
+  context_score: number;
+  audio_score: number;
+  overall_score: number;
+  status: 'candidate' | 'approved' | 'rejected' | 'produced';
+  rationale?: string | null;
+  video_title?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DailySelectionResponse {
+  target_count: number;
+  selected_count: number;
+  has_sufficient_moments: boolean;
+  candidates: CandidateClip[];
+}
+
+export interface RankingWeightsInput {
+  hook_weight?: number;
+  retention_weight?: number;
+  context_weight?: number;
+  audio_weight?: number;
 }
