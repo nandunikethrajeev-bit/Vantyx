@@ -159,3 +159,29 @@ export interface RankingWeightsInput {
   context_weight?: number;
   audio_weight?: number;
 }
+
+// ---------------- Production & Video Rendering ----------------
+
+export interface RenderSettingsInput {
+  layout_style?: 'blurred_backdrop' | 'crop_center';
+  has_burned_subtitles?: boolean;
+  resolution?: string;
+  normalize_audio?: boolean;
+}
+
+export interface RenderJob {
+  id: number;
+  candidate_id: number;
+  source_id: number;
+  status: 'queued' | 'rendering' | 'completed' | 'failed';
+  progress_pct: number;
+  output_file_path?: string | null;
+  thumbnail_path?: string | null;
+  resolution: string;
+  format_aspect: string;
+  layout_style: string;
+  has_burned_subtitles: boolean;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+}

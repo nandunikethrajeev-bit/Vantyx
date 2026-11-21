@@ -49,6 +49,7 @@ postgres_data/
 *.db
 
 # Media & Video Processing artifacts (future pipelines)
+data/
 media/
 videos/
 temp/
@@ -56,6 +57,8 @@ artifacts/
 *.mp4
 *.mkv
 *.webm
+*.jpg
+*.jpeg
 
 # OS & IDE
 .DS_Store

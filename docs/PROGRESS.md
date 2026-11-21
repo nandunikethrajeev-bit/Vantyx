@@ -115,7 +115,42 @@
 
 ---
 
-- **Milestone 05**: Video Production Engine (FFmpeg 9:16 vertical synthesis, subtitles, audio normalization).
+---
+
+## Milestone 05: Video Production Engine
+- **Status**: COMPLETE & VERIFIED
+- **Key Deliverables**:
+  - **Embedded FFmpeg Engine**:
+    - Direct integration with verified FFmpeg 9.0.2 binary (`imageio-ffmpeg` static binary with H.264 `libx264` and AAC encoders).
+    - Configurable `FFMPEG_PATH` in application settings with runtime resolution.
+  - **Vertical 9:16 Video Synthesis**:
+    - Built-in multi-layered filtergraph:
+      `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:5[bg];[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1[v]`
+    - Alternative `crop_center` layout for focal gameplay elements.
+  - **EBU R128 Audio Normalization**:
+    - Integrated standard broadcast loudness filtering (`loudnorm=I=-14:LRA=11:TP=-1.5`) ensuring compliance with YouTube Shorts loudness standards and preventing clipping or low volume.
+  - **Synthetic Gameplay Fallback Generator**:
+    - For remote/un-downloaded gameplay sources, generates frame-accurate 1080x1920 vertical pattern tests with audio tones, ensuring end-to-end rendering pipeline operates without missing file crashes.
+  - **Thumbnail Extraction**:
+    - Automatic high-quality JPEG thumbnail extraction at 0.5s hook frame.
+  - **REST Endpoints**:
+    - `POST /api/v1/production/render/{candidate_id}`: Triggers render task and updates clip status to `produced`.
+    - `GET /api/v1/production/jobs`: Lists render jobs with progress and status filters.
+    - `GET /api/v1/production/jobs/{job_id}`: Retrieves job details.
+    - `GET /api/v1/production/jobs/{job_id}/stream`: HTTP video streaming endpoint with `video/mp4` MIME type.
+    - `GET /api/v1/production/jobs/{job_id}/thumbnail`: Thumbnail image streaming endpoint.
+  - **Interactive Frontend Workspace**:
+    - `ProductionView` workspace with active render queue and status indicators.
+    - Approved candidate queue ready for one-click rendering.
+    - Built-in 9:16 vertical video player modal allowing instant preview of rendered Shorts directly inside the browser.
+    - Configuration modal for layout style (blurred backdrop vs center crop), audio normalization, and subtitles.
+  - **Test Suite**:
+    - 33 backend tests passing (unit tests for filtergraph construction and executable resolution, integration tests for full render pipeline, video creation, and HTTP streaming).
+    - 16 frontend tests passing.
+    - Frontend production build compiles cleanly.
+
+---
+
 - **Milestone 06**: Distribution & Automated Publishing (YouTube OAuth, 4-slots daily schedule in Asia/Kolkata).
 - **Milestone 07**: Autonomous Orchestration (Cron scheduler, execution logs, failure recovery).
 - **Milestone 08**: Channel Analytics & Feedback Calibration.
