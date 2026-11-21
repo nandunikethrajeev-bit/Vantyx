@@ -11,6 +11,8 @@
   - Dark, cinematic, minimal React 18 + Vite + TypeScript frontend shell with live telemetry.
   - Comprehensive unit and integration test suites (Pytest + Vitest).
 
+---
+
 ## Milestone 02: Source Discovery & Rights Intelligence
 - **Status**: COMPLETE & VERIFIED
 - **Key Deliverables**:
@@ -101,56 +103,74 @@
 
 ---
 
-## Tooling & Infrastructure Verification: FFmpeg
-- **Status**: VERIFIED & TESTED
-- **Executable**: `C:\Users\Niketh Rajeev\Downloads\VANTYX\backend\.venv\Lib\site-packages\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v9.0.2.exe`
-- **Version**: FFmpeg 9.0.2-essentials_build (gyan.dev)
-- **Codecs Verified**: `libx264` (H.264 video encoder), `aac` (AAC audio encoder)
-- **Filtergraphs Tested**:
-  - Vertical 9:16 re-framing with blurred side-fill:
-    `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:5[bg];[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[v]`
-  - Audio normalization: `loudnorm` filter (EBU R128 / -14 LUFS)
-  - Synthetic test render successfully generated valid MP4 video.
-- **Configurability**: Added `FFMPEG_PATH` to `Settings` with automatic fallback to `imageio-ffmpeg` or system PATH.
-
----
-
----
-
 ## Milestone 05: Video Production Engine
 - **Status**: COMPLETE & VERIFIED
 - **Key Deliverables**:
-  - **Embedded FFmpeg Engine**:
-    - Direct integration with verified FFmpeg 9.0.2 binary (`imageio-ffmpeg` static binary with H.264 `libx264` and AAC encoders).
-    - Configurable `FFMPEG_PATH` in application settings with runtime resolution.
-  - **Vertical 9:16 Video Synthesis**:
-    - Built-in multi-layered filtergraph:
-      `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:5[bg];[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1[v]`
-    - Alternative `crop_center` layout for focal gameplay elements.
-  - **EBU R128 Audio Normalization**:
-    - Integrated standard broadcast loudness filtering (`loudnorm=I=-14:LRA=11:TP=-1.5`) ensuring compliance with YouTube Shorts loudness standards and preventing clipping or low volume.
-  - **Synthetic Gameplay Fallback Generator**:
-    - For remote/un-downloaded gameplay sources, generates frame-accurate 1080x1920 vertical pattern tests with audio tones, ensuring end-to-end rendering pipeline operates without missing file crashes.
-  - **Thumbnail Extraction**:
-    - Automatic high-quality JPEG thumbnail extraction at 0.5s hook frame.
+  - **FFmpeg 9:16 Vertical Video Synthesis**:
+    - Verified bundled executable: `ffmpeg 9.0.2-essentials_build` via `imageio-ffmpeg`. Configurable via `FFMPEG_PATH`.
+    - Multi-layer 1080x1920 filtergraph with 20px blurred backdrop (`boxblur=20:2`) and sharp center-focused foreground.
+    - High-quality H.264 video encoding (`libx264`, `yuv420p`, `-preset fast`, `-crf 22`) and AAC audio encoding.
+    - Professional EBU R128 audio normalization (`loudnorm=I=-14:LRA=11:TP=-1.5`) compliant with YouTube standards.
+    - Standalone 0.5s JPEG thumbnail extraction for high-performance gallery previews.
+    - Synthetic media tracking (`is_synthetic` flag) on `RenderJob` and `VideoSource`.
   - **REST Endpoints**:
-    - `POST /api/v1/production/render/{candidate_id}`: Triggers render task and updates clip status to `produced`.
-    - `GET /api/v1/production/jobs`: Lists render jobs with progress and status filters.
-    - `GET /api/v1/production/jobs/{job_id}`: Retrieves job details.
-    - `GET /api/v1/production/jobs/{job_id}/stream`: HTTP video streaming endpoint with `video/mp4` MIME type.
-    - `GET /api/v1/production/jobs/{job_id}/thumbnail`: Thumbnail image streaming endpoint.
+    - `POST /api/v1/production/render/{candidate_id}` (Executes FFmpeg synthesis).
+    - `GET /api/v1/production/jobs` (Lists render jobs with progress and status).
+    - `GET /api/v1/production/jobs/{job_id}` (Retrieves single job details).
+    - `GET /api/v1/production/jobs/{job_id}/stream` (Streams 1080x1920 MP4 video).
+    - `GET /api/v1/production/jobs/{job_id}/thumbnail` (Streams extracted JPEG thumbnail).
   - **Interactive Frontend Workspace**:
-    - `ProductionView` workspace with active render queue and status indicators.
-    - Approved candidate queue ready for one-click rendering.
-    - Built-in 9:16 vertical video player modal allowing instant preview of rendered Shorts directly inside the browser.
-    - Configuration modal for layout style (blurred backdrop vs center crop), audio normalization, and subtitles.
+    - Dedicated `ProductionView` with render queue, render modal, and HTML5 9:16 phone-frame video preview modal.
   - **Test Suite**:
-    - 33 backend tests passing (unit tests for filtergraph construction and executable resolution, integration tests for full render pipeline, video creation, and HTTP streaming).
+    - 34 backend tests passing (unit tests for filtergraph construction and executable resolution, integration tests for full render pipeline).
     - 16 frontend tests passing.
-    - Frontend production build compiles cleanly.
 
 ---
 
-- **Milestone 06**: Distribution & Automated Publishing (YouTube OAuth, 4-slots daily schedule in Asia/Kolkata).
-- **Milestone 07**: Autonomous Orchestration (Cron scheduler, execution logs, failure recovery).
-- **Milestone 08**: Channel Analytics & Feedback Calibration.
+## Milestone 06: Distribution Engine & Official YouTube Publishing Integration
+- **Status**: COMPLETE & VERIFIED
+- **Key Deliverables**:
+  - **Official Google OAuth 2.0 Integration**:
+    - Authorization flow with minimum required scopes (`https://www.googleapis.com/auth/youtube.upload`).
+    - Offline access support (`access_type="offline"`, `prompt="consent"`) for continuous refresh token handling.
+    - Secure storage in `YouTubeAccount` model without logging credentials.
+    - Front-facing channel identity verification for **Astro Rebel**.
+    - Frontend OAuth setup guide modal with Google Cloud Console instructions and redirect URI.
+  - **Official YouTube Data API v3 Publishing Service**:
+    - Resumable video upload via `videos.insert` endpoint with metadata submission (title, description, tags, category `20` - Gaming).
+    - Status verification via `videos.list`.
+    - Automatic private scheduled upload (`privacyStatus="private"`, `publishAt` future UTC timestamp).
+    - Automatic title synthesis (`GTA 6: [Label] #Shorts`, max 100 chars).
+    - Mandatory creator attribution text injection in description.
+  - **Strict Publishing Eligibility Gate**:
+    - **Synthetic test media is strictly prohibited**: blocks `job.is_synthetic` or `source.is_synthetic`.
+    - Enforces completed render job, 9:16 aspect ratio, duration between 15s and 60s, verified commercial rights, unexpired license, and slot vacancy.
+  - **Daily 4-Slot Scheduling Engine (`Asia/Kolkata` IST)**:
+    - Fixed daily release slots: **09:00, 13:00, 17:00, 21:00 IST**.
+    - Resilient timezone conversion to UTC via `TimezoneHelper` with `tzdata` fallback.
+    - Duplicate slot collision prevention and past-timestamp protection.
+    - Slot status tracking (`unfilled`, `scheduled`, `published`, `expired`).
+  - **Safe Verified Mock Publishing Provider**:
+    - When OAuth credentials are not set or in automated test runs, simulates chunked upload telemetry, records `mock_yt_[id]`, marks `is_mock=True`, and completes the pipeline safely without external network calls.
+  - **REST Endpoints**:
+    - `GET /api/v1/distribution/oauth/url` (Retrieves Google OAuth consent URL).
+    - `GET /api/v1/distribution/oauth/callback` (Exchanges authorization code for tokens).
+    - `GET /api/v1/distribution/channel` (Retrieves connected channel status).
+    - `POST /api/v1/distribution/disconnect` (Disconnects YouTube account).
+    - `GET /api/v1/distribution/slots` (Lists the 4 daily slots for a date).
+    - `POST /api/v1/distribution/schedule` (Schedules a rendered Short for an open slot).
+    - `GET /api/v1/distribution/schedules` (Lists all publishing schedules).
+    - `DELETE /api/v1/distribution/schedule/{id}` (Cancels a scheduled publish).
+    - `POST /api/v1/distribution/publish/{id}` (Triggers upload execution).
+  - **Interactive Frontend Workspace**:
+    - Dedicated `DistributionView` in navigation with `M06 ACTIVE` badge.
+    - Connected Astro Rebel channel panel with OAuth status and disconnect controls.
+    - Interactive 4-slot daily calendar grid in Asia/Kolkata timezone with Today/Tomorrow quick pickers.
+    - One-click "Assign Rendered Short" modal with title preview and creator attribution preview.
+    - "Publish Now" and "Cancel" controls.
+    - Complete publishing schedule queue and history table.
+    - Google Cloud Console OAuth setup guide modal.
+  - **Test Suite**:
+    - **40 backend tests passing** (100% pass rate across all unit and integration tests).
+    - **19 frontend tests passing** (100% pass rate across 8 test suites).
+    - Frontend production build (`tsc -b && vite build`) passing cleanly.

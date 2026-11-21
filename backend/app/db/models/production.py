@@ -24,4 +24,5 @@ class RenderJob(Base, TimestampMixin):
     format_aspect: Mapped[str] = mapped_column(String(16), default="9:16", nullable=False)
     layout_style: Mapped[str] = mapped_column(String(64), default="blurred_backdrop", nullable=False)  # blurred_backdrop | crop_center
     has_burned_subtitles: Mapped[bool] = mapped_column(default=True, nullable=False)
+    is_synthetic: Mapped[bool] = mapped_column(default=False, nullable=False)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

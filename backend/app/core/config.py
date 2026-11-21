@@ -86,12 +86,18 @@ class Settings(BaseSettings):
     YOUTUBE_API_KEY: str = Field(default="", description="YouTube Data API v3 key (optional, public feeds used as fallback)")
     YOUTUBE_CLIENT_ID: str = Field(default="", description="Google OAuth2 Client ID for publishing")
     YOUTUBE_CLIENT_SECRET: str = Field(default="", description="Google OAuth2 Client Secret for publishing")
+    YOUTUBE_REDIRECT_URI: str = Field(default="http://localhost:5173/distribution/oauth/callback", description="OAuth callback redirect URI")
+    MOCK_YOUTUBE_PUBLISHING: bool = Field(default=False, description="Enable simulated publishing provider for safe offline test execution")
     GEMINI_API_KEY: str = Field(default="", description="Gemini API Key for multimodal scene analysis")
 
     # Channel & Pipeline Configuration
     PRIMARY_CHANNEL_NAME: str = Field(default="Astro Rebel", description="Target YouTube publishing channel")
     TARGET_SHORTS_PER_DAY: int = Field(default=4, description="Target daily scheduled shorts count")
     TIMEZONE: str = Field(default="Asia/Kolkata", description="Platform primary scheduling timezone")
+    DEFAULT_PUBLISH_SLOTS: List[str] = Field(
+        default=["09:00", "13:00", "17:00", "21:00"],
+        description="Daily Shorts publication release schedule in local timezone",
+    )
 
     # Media & Rendering Tools
     FFMPEG_PATH: Optional[str] = Field(

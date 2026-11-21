@@ -181,7 +181,85 @@ export interface RenderJob {
   format_aspect: string;
   layout_style: string;
   has_burned_subtitles: boolean;
+  is_synthetic?: boolean;
   error_message?: string | null;
   created_at: string;
   updated_at: string;
 }
+
+// ---------------- Distribution & Publishing Domain Types ----------------
+
+export interface YouTubeAccount {
+  id: number;
+  channel_id: string;
+  channel_title: string;
+  channel_handle?: string | null;
+  thumbnail_url?: string | null;
+  is_active: boolean;
+  connected_at: string;
+}
+
+export interface OAuthUrlResponse {
+  configured: boolean;
+  auth_url?: string | null;
+  message?: string | null;
+}
+
+export interface UploadJob {
+  id: number;
+  schedule_id: number;
+  attempt_number: number;
+  status: 'uploading' | 'processing' | 'verified' | 'failed';
+  bytes_uploaded: number;
+  total_bytes: number;
+  error_detail?: string | null;
+  started_at: string;
+  completed_at?: string | null;
+}
+
+export interface PublishSchedule {
+  id: number;
+  candidate_id: number;
+  render_job_id: number;
+  scheduled_time: string;
+  slot_name: string;
+  timezone: string;
+  target_channel: string;
+  title: string;
+  description?: string | null;
+  tags?: string | null;
+  privacy_status: string;
+  status: 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
+  youtube_video_id?: string | null;
+  publish_url?: string | null;
+  retry_count: number;
+  is_mock: boolean;
+  error_message?: string | null;
+  upload_jobs?: UploadJob[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SlotInfo {
+  slot_name: string;
+  scheduled_time_utc: string;
+  scheduled_time_local: string;
+  status: 'unfilled' | 'scheduled' | 'published' | 'expired';
+  schedule?: PublishSchedule | null;
+}
+
+export interface DailySlotsResponse {
+  target_date: string;
+  timezone: string;
+  slots: SlotInfo[];
+}
+
+export interface PublishTriggerResponse {
+  schedule_id: number;
+  status: string;
+  youtube_video_id?: string | null;
+  publish_url?: string | null;
+  is_mock: boolean;
+  message: string;
+}
+

@@ -86,37 +86,52 @@ Open `http://127.0.0.1:5173` in your browser.
 
 ---
 
-## 4. Testing & Verification
+## 4. Google Cloud Console & YouTube OAuth Setup
 
-### Run Backend Unit & Integration Tests
-```bash
-cd backend
-python -m pytest tests -v
-```
+To enable live autonomous publishing to the **Astro Rebel** YouTube channel:
 
-### Run Frontend Unit Tests
-```bash
-cd frontend
-npm test
-```
+1. **Open Google Cloud Console**: Navigate to [Google Cloud Console](https://console.cloud.google.com/).
+2. **Enable YouTube Data API v3**:
+   - Go to *APIs & Services > Library*.
+   - Search for **YouTube Data API v3** and click **Enable**.
+3. **Configure OAuth Consent Screen**:
+   - Go to *APIs & Services > OAuth consent screen*.
+   - Select User Type: **External**.
+   - Add Test Users: Include the Google account associated with the **Astro Rebel** channel.
+   - Add Scopes: `https://www.googleapis.com/auth/youtube.upload`.
+4. **Create OAuth 2.0 Credentials**:
+   - Go to *APIs & Services > Credentials*.
+   - Click **Create Credentials > OAuth Client ID**.
+   - Application Type: **Web application**.
+   - Authorized Redirect URI:
+     ```
+     http://localhost:8000/api/v1/distribution/oauth/callback
+     ```
+5. **Add Credentials to `.env`**:
+   ```env
+   YOUTUBE_CLIENT_ID="your_client_id.apps.googleusercontent.com"
+   YOUTUBE_CLIENT_SECRET="your_client_secret"
+   YOUTUBE_REDIRECT_URI="http://localhost:8000/api/v1/distribution/oauth/callback"
+   MOCK_YOUTUBE_PUBLISHING=False
+   ```
 
-### Build Frontend Production Bundle
-```bash
-cd frontend
-npm run build
-```
+*Note: If credentials are not set, VANTYX operates safely in verified Mock Publishing mode without network errors.*
 
 ---
 
-## 5. Troubleshooting
+## 5. Testing & Verification
 
-### Problem: PostgreSQL is offline or Docker is not installed
-- **Behavior**: `/api/v1/health/ready` reports `status: degraded` and `components.database.status: unreachable`.
-- **Resolution**: This is expected when PostgreSQL is not running. The application handles database disconnects gracefully. If you need local database persistence, install PostgreSQL 16 locally or start the Docker container in `infrastructure/`.
+### Run Backend Unit & Integration Tests
+```bash
+# Run full suite (40 tests)
+backend\.venv\Scripts\pytest -v backend/tests/
+```
 
-### Problem: CORS errors in browser console
-- **Behavior**: `Access to fetch at ... from origin 'http://localhost:5173' has been blocked by CORS policy`.
-- **Resolution**: Verify that `CORS_ORIGINS` in your `.env` file includes your frontend origin (e.g., `http://localhost:5173,http://127.0.0.1:5173`).
+### Run Frontend Unit Tests & Production Build
+```bash
+# Run unit tests (19 tests)
+npm test --prefix frontend -- --run
 
-### Problem: Sensitive credentials appear in log output
-- **Resolution**: All logs passed through `app.core.logging.logger` automatically apply regex masking. Ensure you never bypass the configured logger by using bare `print()` statements for secret data.
+# Run TypeScript production build
+npm run build --prefix frontend
+```

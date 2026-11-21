@@ -23,6 +23,7 @@ class VideoSource(Base, TimestampMixin):
     source_url: Mapped[str] = mapped_column(String(1024), nullable=False)
     discovery_method: Mapped[str] = mapped_column(String(64), default="feed_ingest", nullable=False)  # feed_ingest | youtube_api | manual_import
     local_video_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    is_synthetic: Mapped[bool] = mapped_column(default=False, nullable=False)
     raw_metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     creator: Mapped[Optional["Creator"]] = relationship("Creator", back_populates="sources", lazy="selectin")

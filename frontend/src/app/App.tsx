@@ -6,6 +6,7 @@ import { DiscoveryView } from '@/features/discovery/DiscoveryView';
 import { IntelligenceView } from '@/features/intelligence/IntelligenceView';
 import { SelectionView } from '@/features/selection/SelectionView';
 import { ProductionView } from '@/features/production/ProductionView';
+import { DistributionView } from '@/features/distribution/DistributionView';
 import { ModulePlaceholderView } from '@/features/placeholders/ModulePlaceholderView';
 import { useSystemHealth } from '@/hooks/useSystemHealth';
 import { NavigationSection } from '@/types';
@@ -60,11 +61,13 @@ export const App: React.FC = () => {
           {currentSection === 'intelligence' && <IntelligenceView />}
           {currentSection === 'selection' && <SelectionView />}
           {currentSection === 'production' && <ProductionView />}
+          {currentSection === 'distribution' && <DistributionView />}
           {currentSection !== 'overview' &&
             currentSection !== 'discovery' &&
             currentSection !== 'intelligence' &&
             currentSection !== 'selection' &&
-            currentSection !== 'production' && (
+            currentSection !== 'production' &&
+            currentSection !== 'distribution' && (
               <ModulePlaceholderView section={currentSection} />
             )}
         </main>

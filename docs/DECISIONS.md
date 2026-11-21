@@ -23,3 +23,18 @@
 - **Context**: Windows workstations often lack a global `ffmpeg.exe` installed in system `PATH`. Requiring manual system PATH modifications introduces external environment brittleness.
 - **Decision**: Added `imageio-ffmpeg` to project dependencies, providing a standalone, tested, bundled 64-bit FFmpeg executable directly within the Python environment.
 - **Consequences**: Video clipping, 9:16 re-framing, and audio processing can execute immediately on any workstation without external OS package managers.
+
+## ADR-005: Strict Synthetic Media Gate at Publishing Queue
+- **Context**: During development and testing of video processing pipelines, synthetic test media (e.g. FFmpeg `testsrc2` or `sine` audio) is generated to verify rendering without downloading multi-gigabyte remote gameplay files. If synthetic test media accidentally reached the publishing queue, placeholder test videos would be uploaded to the official Astro Rebel YouTube channel.
+- **Decision**: Added `is_synthetic: bool = False` to `VideoSource` and `RenderJob`. The Distribution module's `verify_publishing_eligibility` strictly enforces that both `job.is_synthetic` and `source.is_synthetic` are `False`. Any attempt to schedule or upload synthetic media raises `PublishingEligibilityError` and is rejected with HTTP 400.
+- **Consequences**: Impossible for test placeholders to ever enter the Astro Rebel YouTube publishing queue or be uploaded to YouTube.
+
+## ADR-006: Resilient Timezone Handling for Asia/Kolkata Cadence
+- **Context**: VANTYX targets publishing 4 Shorts per day across fixed daily slots (09:00, 13:00, 17:00, 21:00) in the `Asia/Kolkata` timezone (IST, UTC+05:30). Windows operating systems often lack system IANA timezone databases, causing `ZoneInfoNotFoundError: 'No time zone found with key Asia/Kolkata'`.
+- **Decision**: Added `tzdata` to backend dependencies and encapsulated all timezone operations in `TimezoneHelper`. If `zoneinfo.ZoneInfo("Asia/Kolkata")` is available, it uses the IANA database; otherwise, it automatically falls back to `timezone(timedelta(hours=5, minutes=30), name="Asia/Kolkata")`.
+- **Consequences**: 100% resilient timezone calculations across Windows, macOS, Linux, and Docker containers without crashes or external timezone dependencies.
+
+## ADR-007: Safe Verified Mock Publishing Provider
+- **Context**: Google OAuth 2.0 authorization requires external user consent and Google Cloud Console developer credentials. In CI/CD pipelines, automated testing, or offline sandbox environments, external YouTube network calls cannot and should not be made.
+- **Decision**: Implemented `MockPublishingProvider` in `DistributionService`. When `MOCK_YOUTUBE_PUBLISHING=True` or `force_mock=True`, the publishing engine simulates the full chunked upload lifecycle, records telemetry in `UploadJob`, generates a clearly flagged `mock_yt_{id}` identifier, marks `is_mock=True`, and sets the schedule status to `published`.
+- **Consequences**: Full end-to-end integration testing and automated verification without making external network calls or requiring active Google OAuth credentials.

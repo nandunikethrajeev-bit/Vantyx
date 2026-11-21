@@ -4,7 +4,14 @@ Mounts all modular v1 endpoint routers under a single versioned namespace.
 """
 
 from fastapi import APIRouter
-from app.api.v1.endpoints import discovery, health, intelligence, production, selection
+from app.api.v1.endpoints import (
+    discovery,
+    distribution,
+    health,
+    intelligence,
+    production,
+    selection,
+)
 
 api_router = APIRouter()
 
@@ -18,3 +25,5 @@ api_router.include_router(intelligence.router)
 api_router.include_router(selection.router)
 # Milestone 05: Video Production Engine
 api_router.include_router(production.router)
+# Milestone 06: Distribution & Publishing Engine
+api_router.include_router(distribution.router)

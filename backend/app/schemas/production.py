@@ -26,6 +26,7 @@ class RenderJobBase(BaseModel):
     format_aspect: str = "9:16"
     layout_style: str = "blurred_backdrop"
     has_burned_subtitles: bool = True
+    is_synthetic: bool = False
 
 
 class RenderJobCreate(RenderJobBase):
