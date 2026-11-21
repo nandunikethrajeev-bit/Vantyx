@@ -30,13 +30,15 @@ M04: Clip Selection
 
 ---
 
-## Milestone 02: Source Discovery & Permission Rights
+## Milestone 02: Source Discovery & Permission Rights (Complete)
 **Objective**: Autonomous ingestion of approved GTA 6 gameplay creators with strict licensing and attribution controls.
-- [ ] Creator channel registry and whitelisting engine
-- [ ] Commercial-use rights verification and licensing proof storage
-- [ ] Video metadata ingestion (title, description, tags, duration, upload date)
-- [ ] Candidate video queue with eligibility validation
-- [ ] Persistent database schema for creators, sources, and raw video catalog
+- [x] Creator channel registry and whitelisting engine (`Creator` model and API)
+- [x] Commercial-use rights verification and licensing proof storage (`RightsRecord` model)
+- [x] Video metadata ingestion (title, description, duration, upload date, thumbnails)
+- [x] Resilient dual-path discovery engine (YouTube Data API v3 + zero-credential public Atom feeds)
+- [x] Candidate video queue with legal eligibility validation gate (`evaluate_eligibility`)
+- [x] Interactive Discovery workspace in frontend with real-time sweep actions, modals, and tables
+- [x] Persistent database schema supporting PostgreSQL and resilient SQLite fallback
 
 ---
 

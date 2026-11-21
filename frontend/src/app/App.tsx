@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { OverviewView } from '@/features/overview/OverviewView';
+import { DiscoveryView } from '@/features/discovery/DiscoveryView';
 import { ModulePlaceholderView } from '@/features/placeholders/ModulePlaceholderView';
 import { useSystemHealth } from '@/hooks/useSystemHealth';
 import { NavigationSection } from '@/types';
@@ -44,14 +45,16 @@ export const App: React.FC = () => {
 
         {/* Central Workspace Scroll Area */}
         <main className="flex-1 overflow-y-auto px-8 py-8">
-          {currentSection === 'overview' ? (
+          {currentSection === 'overview' && (
             <OverviewView
               connectionState={connectionState}
               liveness={liveness}
               readiness={readiness}
               errorMessage={errorMessage}
             />
-          ) : (
+          )}
+          {currentSection === 'discovery' && <DiscoveryView />}
+          {currentSection !== 'overview' && currentSection !== 'discovery' && (
             <ModulePlaceholderView section={currentSection} />
           )}
         </main>

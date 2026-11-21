@@ -13,7 +13,9 @@ def test_default_settings():
     assert cfg.API_V1_PREFIX == "/api/v1"
     assert "http://localhost:5173" in cfg.CORS_ORIGINS
     assert "vantyx" in cfg.async_database_url
-    assert "postgresql+asyncpg://" in cfg.async_database_url
+
+    pg_cfg = Settings(DB_DIALECT="postgresql")
+    assert "postgresql+asyncpg://" in pg_cfg.async_database_url
 
 
 def test_cors_origins_parsing():

@@ -16,6 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import logger
+from app.db.session import init_db
 from app.schemas.error import ErrorItem, ErrorResponse
 
 
@@ -24,6 +25,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager for initialization and graceful teardown."""
     logger.info(f"Initializing {settings.PROJECT_NAME} backend in [{settings.ENVIRONMENT}] environment")
     logger.info(f"Loaded CORS origins: {settings.CORS_ORIGINS}")
+    try:
+        await init_db()
+    except Exception as exc:
+        logger.warning(f"Database initialization deferred: {exc}")
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME} backend gracefully")
 

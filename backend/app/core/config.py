@@ -2,11 +2,24 @@
 
 Loads and validates application settings using Pydantic Settings.
 Environment variables can override any default settings safely.
+Supports both PostgreSQL (production/docker) and resilient local SQLite fallback.
 """
 
+import os
+import socket
+from pathlib import Path
 from typing import List, Union
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _is_port_open(host: str, port: int, timeout: float = 0.2) -> bool:
+    """Quick check to see if a TCP port is responding."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        return False
 
 
 class Settings(BaseSettings):
@@ -38,7 +51,16 @@ class Settings(BaseSettings):
         description="Allowed CORS origins list or comma-separated string",
     )
 
-    # PostgreSQL Database Settings
+    # Storage & Data Paths
+    DATA_DIR: str = Field(default="./data", description="Base data directory for media and database")
+    MEDIA_DIR: str = Field(default="./data/media", description="Directory for video rendering and clip cache")
+    EXPORT_DIR: str = Field(default="./data/exports", description="Directory for completed 9:16 vertical shorts")
+
+    # Database Settings
+    DB_DIALECT: str = Field(
+        default="auto",
+        description="Database dialect mode: auto | postgresql | sqlite",
+    )
     POSTGRES_SERVER: str = Field(default="localhost", description="PostgreSQL host")
     POSTGRES_PORT: int = Field(default=5432, description="PostgreSQL port")
     POSTGRES_USER: str = Field(default="vantyx_user", description="PostgreSQL username")
@@ -48,17 +70,28 @@ class Settings(BaseSettings):
     # Pre-constructed or override Database URLs
     DATABASE_URL: str = Field(
         default="",
-        description="Full async connection string (e.g. postgresql+asyncpg://...)",
+        description="Full async connection string (e.g. postgresql+asyncpg://... or sqlite+aiosqlite:///...)",
     )
     DATABASE_SYNC_URL: str = Field(
         default="",
-        description="Full sync connection string for Alembic (e.g. postgresql://...)",
+        description="Full sync connection string for Alembic (e.g. postgresql://... or sqlite:///...)",
     )
 
     # Database Pool Settings
     DB_POOL_SIZE: int = Field(default=10, description="SQLAlchemy connection pool size")
     DB_MAX_OVERFLOW: int = Field(default=20, description="SQLAlchemy connection pool max overflow")
     DB_POOL_TIMEOUT: int = Field(default=30, description="SQLAlchemy connection pool timeout in seconds")
+
+    # External Provider Credentials (Optional / Configurable)
+    YOUTUBE_API_KEY: str = Field(default="", description="YouTube Data API v3 key (optional, public feeds used as fallback)")
+    YOUTUBE_CLIENT_ID: str = Field(default="", description="Google OAuth2 Client ID for publishing")
+    YOUTUBE_CLIENT_SECRET: str = Field(default="", description="Google OAuth2 Client Secret for publishing")
+    GEMINI_API_KEY: str = Field(default="", description="Gemini API Key for multimodal scene analysis")
+
+    # Channel & Pipeline Configuration
+    PRIMARY_CHANNEL_NAME: str = Field(default="Astro Rebel", description="Target YouTube publishing channel")
+    TARGET_SHORTS_PER_DAY: int = Field(default=4, description="Target daily scheduled shorts count")
+    TIMEZONE: str = Field(default="Asia/Kolkata", description="Platform primary scheduling timezone")
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -67,25 +100,54 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
+    def _get_sqlite_paths(self) -> tuple[str, str]:
+        data_path = Path(self.DATA_DIR).resolve()
+        data_path.mkdir(parents=True, exist_ok=True)
+        db_file = (data_path / "vantyx.db").as_posix()
+        return f"sqlite+aiosqlite:///{db_file}", f"sqlite:///{db_file}"
+
     @property
     def async_database_url(self) -> str:
         """Return the async database connection URL."""
         if self.DATABASE_URL:
             return self.DATABASE_URL
-        return (
-            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        )
+        if self.DB_DIALECT == "sqlite":
+            async_url, _ = self._get_sqlite_paths()
+            return async_url
+        if self.DB_DIALECT == "postgresql":
+            return (
+                f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+        # auto mode: check if postgres is reachable
+        if _is_port_open(self.POSTGRES_SERVER, self.POSTGRES_PORT):
+            return (
+                f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+        async_url, _ = self._get_sqlite_paths()
+        return async_url
 
     @property
     def sync_database_url(self) -> str:
         """Return the synchronous database connection URL (for migrations/Alembic)."""
         if self.DATABASE_SYNC_URL:
             return self.DATABASE_SYNC_URL
-        return (
-            f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        )
+        if self.DB_DIALECT == "sqlite":
+            _, sync_url = self._get_sqlite_paths()
+            return sync_url
+        if self.DB_DIALECT == "postgresql":
+            return (
+                f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+        if _is_port_open(self.POSTGRES_SERVER, self.POSTGRES_PORT):
+            return (
+                f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+        _, sync_url = self._get_sqlite_paths()
+        return sync_url
 
 
 settings = Settings()
