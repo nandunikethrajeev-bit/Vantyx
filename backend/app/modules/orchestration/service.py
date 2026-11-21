@@ -384,15 +384,19 @@ class OrchestrationService:
             if len(selected_candidates) >= settings.TARGET_SHORTS_PER_DAY:
                 break
 
+        await db.commit()
+
         # Check total approved candidates ready for production
         approved_stmt = select(CandidateClip).where(CandidateClip.status == "approved")
         all_approved = list((await db.execute(approved_stmt)).scalars().all())
 
+        candidates_count = len(all_approved) if all_approved else len(selected_candidates)
+
         output = {
             "new_candidates_selected": len(selected_candidates),
-            "total_approved_candidates": len(all_approved),
+            "total_approved_candidates": candidates_count,
             "target_daily_quota": settings.TARGET_SHORTS_PER_DAY,
-            "has_sufficient_moments": len(all_approved) >= settings.TARGET_SHORTS_PER_DAY,
+            "has_sufficient_moments": candidates_count >= settings.TARGET_SHORTS_PER_DAY,
         }
 
         step.output_data = output
@@ -400,7 +404,7 @@ class OrchestrationService:
         step.completed_at = datetime.now(timezone.utc)
 
         metadata = dict(run.execution_metadata or {})
-        metadata["candidates_selected"] = len(all_approved)
+        metadata["candidates_selected"] = candidates_count
         run.execution_metadata = metadata
 
         await cls.log_event(
@@ -450,7 +454,7 @@ class OrchestrationService:
             existing_job_stmt = select(RenderJob).where(
                 RenderJob.candidate_id == candidate.id, RenderJob.status == "completed"
             )
-            existing_job = (await db.execute(existing_job_stmt)).scalar_one_or_none()
+            existing_job = (await db.execute(existing_job_stmt)).scalars().first()
 
             if existing_job:
                 rendered_jobs.append(existing_job)
@@ -528,7 +532,7 @@ class OrchestrationService:
                 PublishSchedule.candidate_id == job.candidate_id,
                 PublishSchedule.status.in_(["scheduled", "published"]),
             )
-            if (await db.execute(sched_check)).scalar_one_or_none():
+            if (await db.execute(sched_check)).scalars().first():
                 continue
 
             # 2. Find first unfilled slot in the daily plan
@@ -836,7 +840,7 @@ class OrchestrationService:
             .order_by(WorkflowRun.id.desc())
             .limit(1)
         )
-        return (await db.execute(stmt)).scalar_one_or_none()
+        return (await db.execute(stmt)).scalars().first()
 
     @classmethod
     async def list_workflows(
@@ -861,7 +865,7 @@ class OrchestrationService:
             .options(selectinload(WorkflowRun.steps), selectinload(WorkflowRun.logs))
             .where(WorkflowRun.run_id == run_id)
         )
-        return (await db.execute(stmt)).scalar_one_or_none()
+        return (await db.execute(stmt)).scalars().first()
 
     @classmethod
     async def recover_stalled_workflows(cls, db: AsyncSession) -> int:

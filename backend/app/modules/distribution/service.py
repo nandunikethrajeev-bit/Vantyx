@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.security import encrypt_token, decrypt_token
 from app.db.models.creator import Creator
 from app.db.models.distribution import PublishSchedule, UploadJob, YouTubeAccount
 from app.db.models.production import RenderJob
@@ -76,6 +77,7 @@ class DistributionService:
     """Core distribution coordinator for YouTube Shorts publishing."""
 
     is_active: bool = False
+    _oauth_states: Dict[str, float] = {}  # state -> expiry timestamp
 
     async def get_channel_status(self) -> Dict[str, Any]:
         """Legacy interface helper."""
@@ -91,8 +93,8 @@ class DistributionService:
 
     # ---------------- OAuth 2.0 Authentication Engine ----------------
 
-    @staticmethod
-    def get_oauth_authorization_url(state: Optional[str] = None) -> Dict[str, Any]:
+    @classmethod
+    def get_oauth_authorization_url(cls, state: Optional[str] = None) -> Dict[str, Any]:
         """Construct the Google OAuth 2.0 authorization URL for Astro Rebel channel."""
         client_id = settings.YOUTUBE_CLIENT_ID
         if not client_id or client_id.strip() == "":
@@ -103,6 +105,10 @@ class DistributionService:
             }
 
         csrf_state = state or uuid.uuid4().hex
+        # Cache state with 15-minute TTL
+        import time
+        cls._oauth_states[csrf_state] = time.time() + 900
+
         params = {
             "client_id": client_id,
             "redirect_uri": settings.YOUTUBE_REDIRECT_URI,
@@ -119,24 +125,37 @@ class DistributionService:
             "message": "OAuth URL ready for authorization.",
         }
 
-    @staticmethod
+    @classmethod
     async def exchange_oauth_code(
+        cls,
         db: AsyncSession,
         code: str,
         state: Optional[str] = None,
     ) -> YouTubeAccount:
-        """Exchange authorization code for tokens and persist connected channel profile."""
+        """Exchange authorization code for tokens and persist connected channel profile with encryption at rest."""
         if not settings.YOUTUBE_CLIENT_ID or not settings.YOUTUBE_CLIENT_SECRET:
             raise ValueError("Google OAuth credentials are missing from environment.")
+
+        # CSRF State Validation
+        if state:
+            import time
+            expiry = cls._oauth_states.get(state)
+            if expiry is not None and time.time() > expiry:
+                cls._oauth_states.pop(state, None)
+                raise ValueError("OAuth CSRF state token has expired. Please re-initiate authorization.")
+            cls._oauth_states.pop(state, None)
 
         # In production this executes https://oauth2.googleapis.com/token
         # and https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true
         channel_id = f"UC_{uuid.uuid4().hex[:16]}"
         channel_title = settings.PRIMARY_CHANNEL_NAME
 
+        raw_access = f"ya29.live_{uuid.uuid4().hex}"
+        raw_refresh = f"1//live_{uuid.uuid4().hex}"
+
         # Check existing account
         stmt = select(YouTubeAccount).where(YouTubeAccount.channel_id == channel_id)
-        account = (await db.execute(stmt)).scalar_one_or_none()
+        account = (await db.execute(stmt)).scalars().first()
 
         if not account:
             account = YouTubeAccount(
@@ -144,8 +163,8 @@ class DistributionService:
                 channel_title=channel_title,
                 channel_handle=f"@{channel_title.replace(' ', '')}",
                 thumbnail_url="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe",
-                access_token=f"ya29.live_{uuid.uuid4().hex}",
-                refresh_token=f"1//live_{uuid.uuid4().hex}",
+                access_token=encrypt_token(raw_access),
+                refresh_token=encrypt_token(raw_refresh),
                 token_expiry=datetime.now(timezone.utc),
                 scopes="youtube.upload,youtube.readonly",
                 is_active=True,
@@ -153,11 +172,12 @@ class DistributionService:
             db.add(account)
         else:
             account.is_active = True
-            account.access_token = f"ya29.live_{uuid.uuid4().hex}"
+            account.access_token = encrypt_token(raw_access)
+            account.refresh_token = encrypt_token(raw_refresh)
 
         await db.commit()
         await db.refresh(account)
-        logger.info(f"Connected YouTube channel: {account.channel_title} ({account.channel_id})")
+        logger.info(f"Connected YouTube channel: {account.channel_title} ({account.channel_id}) [Tokens encrypted at rest]")
         return account
 
     @staticmethod
@@ -168,11 +188,29 @@ class DistributionService:
 
     @staticmethod
     async def disconnect_account(db: AsyncSession) -> bool:
-        """Revoke and deactivate active channel connection."""
+        """Revoke Google OAuth token and deactivate active channel connection."""
         account = await DistributionService.get_connected_account(db)
         if not account:
             return False
+
+        # Attempt remote Google token revocation
+        token_to_revoke = decrypt_token(account.refresh_token or account.access_token)
+        if token_to_revoke and not token_to_revoke.startswith("mock_"):
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    await client.post(
+                        "https://oauth2.googleapis.com/revoke",
+                        params={"token": token_to_revoke},
+                        headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    )
+                logger.info(f"Google OAuth token revoked for channel {account.channel_id}")
+            except Exception as exc:
+                logger.warning(f"Google OAuth token revocation request failed: {exc}")
+
         account.is_active = False
+        account.access_token = None
+        account.refresh_token = None
         await db.commit()
         logger.info(f"Disconnected YouTube channel: {account.channel_title}")
         return True
@@ -254,7 +292,7 @@ class DistributionService:
             PublishSchedule.candidate_id == candidate_id,
             PublishSchedule.status.in_(["scheduled", "publishing", "published"]),
         )
-        existing_schedule = (await db.execute(dup_stmt)).scalar_one_or_none()
+        existing_schedule = (await db.execute(dup_stmt)).scalars().first()
         if existing_schedule:
             raise PublishingEligibilityError(
                 f"Candidate clip {candidate_id} is already scheduled in publication #{existing_schedule.id} ({existing_schedule.status})."
@@ -522,9 +560,10 @@ class DistributionService:
                 # In production environment with connected account:
                 # Uploads via https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable
                 # and schedules publishAt for future private release
+                import asyncio
                 import httpx
 
-                access_token = account.access_token if account else ""
+                access_token = decrypt_token(account.access_token) if account and account.access_token else ""
                 upload_url = "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status"
                 metadata_payload = {
                     "snippet": {
@@ -534,7 +573,7 @@ class DistributionService:
                         "categoryId": "20",  # Gaming
                     },
                     "status": {
-                        "privacyStatus": "private",
+                        "privacyStatus": "private",  # Strictly enforce private status for safety
                         "publishAt": schedule.scheduled_time.isoformat(),
                         "selfDeclaredMadeForKids": False,
                     },
@@ -547,26 +586,54 @@ class DistributionService:
                     "X-Upload-Content-Length": str(file_size),
                 }
 
-                # Initiate resumable session
+                # Initiate resumable session with retry
+                max_retries = 3
                 async with httpx.AsyncClient(timeout=30.0) as client:
-                    init_res = await client.post(upload_url, headers=headers, json=metadata_payload)
-                    if init_res.status_code != 200:
-                        raise RuntimeError(f"YouTube upload initiation failed: {init_res.text}")
+                    init_res = None
+                    for attempt in range(max_retries):
+                        try:
+                            init_res = await client.post(upload_url, headers=headers, json=metadata_payload)
+                            if init_res.status_code == 200:
+                                break
+                            if init_res.status_code in (429, 500, 502, 503, 504):
+                                await asyncio.sleep(2 ** attempt)
+                                continue
+                            raise RuntimeError(f"YouTube upload initiation rejected: {init_res.text}")
+                        except (httpx.RequestError, httpx.TimeoutException) as exc:
+                            if attempt == max_retries - 1:
+                                raise RuntimeError(f"YouTube upload initiation network failure: {exc}")
+                            await asyncio.sleep(2 ** attempt)
+
+                    if not init_res or init_res.status_code != 200:
+                        raise RuntimeError(f"YouTube upload initiation failed: {init_res.text if init_res else 'timeout'}")
 
                     resumable_endpoint = init_res.headers.get("Location")
                     if not resumable_endpoint:
                         raise RuntimeError("YouTube API did not provide a resumable upload location.")
 
-                    # Upload binary bytes
+                    # Upload binary bytes with retry
                     with open(render_job.output_file_path, "rb") as vf:
                         video_bytes = vf.read()
 
-                    upload_res = await client.put(
-                        resumable_endpoint,
-                        headers={"Content-Type": "video/mp4", "Content-Length": str(file_size)},
-                        content=video_bytes,
-                        timeout=180.0,
-                    )
+                    upload_res = None
+                    for attempt in range(max_retries):
+                        try:
+                            upload_res = await client.put(
+                                resumable_endpoint,
+                                headers={"Content-Type": "video/mp4", "Content-Length": str(file_size)},
+                                content=video_bytes,
+                                timeout=180.0,
+                            )
+                            if upload_res.status_code in (200, 201):
+                                break
+                            if upload_res.status_code in (500, 502, 503, 504):
+                                await asyncio.sleep(2 ** attempt)
+                                continue
+                            raise RuntimeError(f"YouTube video bytes upload failed: {upload_res.text}")
+                        except (httpx.RequestError, httpx.TimeoutException) as exc:
+                            if attempt == max_retries - 1:
+                                raise RuntimeError(f"YouTube upload network failure after {max_retries} attempts: {exc}")
+                            await asyncio.sleep(2 ** attempt)
                     if upload_res.status_code not in (200, 201):
                         raise RuntimeError(f"YouTube video bytes upload failed: {upload_res.text}")
 

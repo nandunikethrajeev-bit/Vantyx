@@ -104,26 +104,100 @@ class HeuristicAIProvider(AIProviderInterface):
 
 
 class GeminiAIProvider(AIProviderInterface):
-    """Multimodal AI video understanding engine powered by Google Gemini API."""
+    """Multimodal AI video understanding engine powered by Google Gemini API.
+    
+    Includes exponential backoff on rate limits (HTTP 429), strict timeouts,
+    structured JSON validation, and safe graceful fallback to Heuristic provider.
+    """
 
     def __init__(self, api_key: str):
         self.api_key = api_key
+        self.last_used_provider: str = "heuristic"
 
     async def analyze_video(self, source: VideoSource) -> List[Dict[str, Any]]:
         # Fall back gracefully to Heuristic if API key is empty
-        if not self.api_key:
-            logger.info("GEMINI_API_KEY not set. Using Heuristic AI Provider.")
-            return await HeuristicAIProvider().analyze_video(source)
+        if not self.api_key or not self.api_key.strip():
+            logger.info("GEMINI_API_KEY not configured. Using Heuristic AI Provider.")
+            self.last_used_provider = "heuristic"
+            scenes = await HeuristicAIProvider().analyze_video(source)
+            for s in scenes:
+                s["provider_used"] = "heuristic"
+            return scenes
 
-        try:
-            # When API key is provided, execute multimodal prompt analysis
-            logger.info(f"Invoking Gemini video intelligence for {source.title} ({source.video_id})")
-            # In a full run, we extract audio/video frames or pass source URL
-            # Return high-quality structured intelligence
-            return await HeuristicAIProvider().analyze_video(source)
-        except Exception as exc:
-            logger.error(f"Gemini API invocation error: {exc}. Falling back to Heuristic engine.")
-            return await HeuristicAIProvider().analyze_video(source)
+        import asyncio
+        import json
+        import httpx
+
+        max_retries = 3
+        prompt = (
+            f"Analyze this GTA 6 gameplay video titled '{source.title}' (duration: {source.duration_seconds}s). "
+            "Identify distinct, high-energy, interesting gameplay moments suitable for vertical Shorts. "
+            "Return a JSON object with a 'scenes' list containing objects with: "
+            "start_time (float), end_time (float), scene_label (string), description (string), "
+            "speech_transcript (string), action_intensity (0.0 to 1.0), excitement_score (0.0 to 1.0), tags (list of strings)."
+        )
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.api_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"response_mime_type": "application/json"},
+        }
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Invoking Gemini video intelligence for {source.title} (attempt {attempt + 1}/{max_retries})")
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(url, json=payload)
+
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        text_content = (
+                            data.get("candidates", [{}])[0]
+                            .get("content", {})
+                            .get("parts", [{}])[0]
+                            .get("text", "")
+                        )
+                        parsed = json.loads(text_content)
+                        raw_scenes = parsed.get("scenes", [])
+                        if raw_scenes and isinstance(raw_scenes, list):
+                            scenes = []
+                            for item in raw_scenes:
+                                scenes.append({
+                                    "start_time": float(item.get("start_time", 0.0)),
+                                    "end_time": min(float(item.get("end_time", 30.0)), source.duration_seconds),
+                                    "scene_label": str(item.get("scene_label", "Gameplay Sequence")),
+                                    "description": str(item.get("description", "")),
+                                    "speech_transcript": str(item.get("speech_transcript", "")),
+                                    "action_intensity": float(item.get("action_intensity", 0.7)),
+                                    "excitement_score": float(item.get("excitement_score", 0.7)),
+                                    "tags": list(item.get("tags", ["gta6"])),
+                                    "provider_used": "gemini",
+                                })
+                            self.last_used_provider = "gemini"
+                            logger.info(f"Gemini successfully extracted {len(scenes)} scenes for {source.title}")
+                            return scenes
+                    elif resp.status_code in (429, 503):
+                        backoff = 2 ** attempt
+                        logger.warning(f"Gemini rate limited (HTTP {resp.status_code}). Backing off for {backoff}s...")
+                        await asyncio.sleep(backoff)
+                        continue
+                    else:
+                        logger.warning(f"Gemini API returned HTTP {resp.status_code}: {resp.text[:200]}")
+                        break
+            except (httpx.TimeoutException, httpx.RequestError) as exc:
+                logger.warning(f"Gemini API network issue on attempt {attempt + 1}: {exc}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+            except Exception as exc:
+                logger.error(f"Unexpected error in Gemini intelligence: {exc}")
+                break
+
+        logger.warning(f"Gemini analysis unavailable or exhausted retries for {source.title}. Falling back to Heuristic provider.")
+        self.last_used_provider = "heuristic_fallback"
+        scenes = await HeuristicAIProvider().analyze_video(source)
+        for s in scenes:
+            s["provider_used"] = "heuristic_fallback"
+        return scenes
 
 
 # ---------------- Intelligence Service Core ----------------
@@ -204,11 +278,17 @@ class IntelligenceService:
                 )
                 db.add(scene)
 
+            final_provider = getattr(provider_instance, "last_used_provider", active_provider_name)
+            job.provider = final_provider
             job.status = "completed"
-            job.raw_result = {"scene_count": len(scene_data_list), "timestamp": datetime.now(timezone.utc).isoformat()}
+            job.raw_result = {
+                "provider_used": final_provider,
+                "scene_count": len(scene_data_list),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
             await db.commit()
             await db.refresh(job)
-            logger.info(f"AI intelligence complete for source ID {source_id}: {len(scene_data_list)} scenes indexed")
+            logger.info(f"AI intelligence complete for source ID {source_id} via {final_provider}: {len(scene_data_list)} scenes indexed")
 
         except Exception as exc:
             job.status = "failed"

@@ -1,0 +1,74 @@
+services:
+  postgres:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+
+  redis:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+
+  backend:
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - APP_ENV=production
+      - DEBUG=false
+      - DB_DIALECT=postgresql
+      - CELERY_ALWAYS_EAGER=false
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+
+  celery_worker:
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - APP_ENV=production
+      - DEBUG=false
+      - DB_DIALECT=postgresql
+      - CELERY_ALWAYS_EAGER=false
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4096M
+
+  celery_beat:
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - APP_ENV=production
+      - DEBUG=false
+      - DB_DIALECT=postgresql
+      - CELERY_ALWAYS_EAGER=false
+
+  frontend:
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"

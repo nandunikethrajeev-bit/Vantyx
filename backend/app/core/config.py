@@ -33,11 +33,16 @@ class Settings(BaseSettings):
     # Core Application Settings
     PROJECT_NAME: str = Field(default="VANTYX", description="Project brand name")
     ENVIRONMENT: str = Field(default="development", description="Runtime environment: development | staging | production")
+    APP_ENV: str = Field(default="development", description="Runtime environment alias: development | staging | production")
     DEBUG: bool = Field(default=False, description="Debug mode")
     LOG_LEVEL: str = Field(default="INFO", description="Structured logging level")
     SECRET_KEY: str = Field(
         default="development-insecure-secret-key-change-in-production-32chars",
         description="Application secret key for internal token verification and signing",
+    )
+    TOKEN_ENCRYPTION_KEY: str = Field(
+        default="",
+        description="Fernet/AES-256 encryption key for OAuth tokens at rest",
     )
 
     # API Routing
@@ -153,8 +158,34 @@ class Settings(BaseSettings):
         return f"sqlite+aiosqlite:///{db_file}", f"sqlite:///{db_file}"
 
     @property
+    def is_production(self) -> bool:
+        env_from_os = (os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or "").lower()
+        if env_from_os in ("production", "prod"):
+            return True
+        return self.APP_ENV.lower() in ("production", "prod") or self.ENVIRONMENT.lower() in ("production", "prod")
+
+    @property
     def async_database_url(self) -> str:
-        """Return the async database connection URL."""
+        """Return the async database connection URL.
+        
+        Strictly rejects SQLite/in-memory in production mode.
+        """
+        if self.is_production:
+            if self.DB_DIALECT == "sqlite":
+                raise RuntimeError(
+                    "PostgreSQL connection required in production mode. SQLite is strictly prohibited."
+                )
+            if self.DATABASE_URL:
+                if self.DATABASE_URL.startswith("sqlite") or ":memory:" in self.DATABASE_URL:
+                    raise RuntimeError(
+                        "PostgreSQL connection required in production mode. SQLite is strictly prohibited."
+                    )
+                return self.DATABASE_URL
+            return (
+                f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+
         if self.DATABASE_URL:
             return self.DATABASE_URL
         if self.DB_DIALECT == "sqlite":
@@ -176,7 +207,26 @@ class Settings(BaseSettings):
 
     @property
     def sync_database_url(self) -> str:
-        """Return the synchronous database connection URL (for migrations/Alembic)."""
+        """Return the synchronous database connection URL (for migrations/Alembic).
+        
+        Strictly rejects SQLite/in-memory in production mode.
+        """
+        if self.is_production:
+            if self.DB_DIALECT == "sqlite":
+                raise RuntimeError(
+                    "PostgreSQL connection required in production mode. SQLite is strictly prohibited."
+                )
+            if self.DATABASE_SYNC_URL:
+                if self.DATABASE_SYNC_URL.startswith("sqlite") or ":memory:" in self.DATABASE_SYNC_URL:
+                    raise RuntimeError(
+                        "PostgreSQL connection required in production mode. SQLite is strictly prohibited."
+                    )
+                return self.DATABASE_SYNC_URL
+            return (
+                f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+
         if self.DATABASE_SYNC_URL:
             return self.DATABASE_SYNC_URL
         if self.DB_DIALECT == "sqlite":

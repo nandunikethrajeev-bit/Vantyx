@@ -10,7 +10,7 @@ export type NavigationSection =
   | 'settings';
 
 export interface ComponentHealth {
-  status: 'healthy' | 'degraded' | 'unreachable';
+  status: 'healthy' | 'degraded' | 'unreachable' | 'mock_mode' | 'heuristic_fallback' | 'eager_development' | string;
   message: string;
   latency_ms?: number | null;
 }

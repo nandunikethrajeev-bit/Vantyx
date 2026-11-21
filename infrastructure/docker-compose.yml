@@ -17,6 +17,137 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: vantyx_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: vantyx_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=development
+      - DB_DIALECT=postgresql
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-vantyx_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vantyx_password}
+      - POSTGRES_DB=${POSTGRES_DB:-vantyx}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - CELERY_ALWAYS_EAGER=false
+      - DATA_DIR=/app/data
+      - MEDIA_DIR=/app/data/media
+      - EXPORT_DIR=/app/data/exports
+      - SECRET_KEY=${SECRET_KEY:-development-insecure-secret-key-change-in-production-32chars}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - YOUTUBE_CLIENT_ID=${YOUTUBE_CLIENT_ID:-}
+      - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET:-}
+      - MOCK_YOUTUBE_PUBLISHING=${MOCK_YOUTUBE_PUBLISHING:-false}
+      - MOCK_YOUTUBE_ANALYTICS=${MOCK_YOUTUBE_ANALYTICS:-true}
+    ports:
+      - "8000:8000"
+    volumes:
+      - storage_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  celery_worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: vantyx_worker
+    command: celery -A app.core.celery_app worker --loglevel=info -c 2 -E
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=development
+      - DB_DIALECT=postgresql
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-vantyx_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vantyx_password}
+      - POSTGRES_DB=${POSTGRES_DB:-vantyx}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - CELERY_ALWAYS_EAGER=false
+      - DATA_DIR=/app/data
+      - MEDIA_DIR=/app/data/media
+      - EXPORT_DIR=/app/data/exports
+      - SECRET_KEY=${SECRET_KEY:-development-insecure-secret-key-change-in-production-32chars}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
+    volumes:
+      - storage_data:/app/data
+
+  celery_beat:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: vantyx_beat
+    command: celery -A app.core.celery_app beat --loglevel=info
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=development
+      - DB_DIALECT=postgresql
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-vantyx_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vantyx_password}
+      - POSTGRES_DB=${POSTGRES_DB:-vantyx}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - CELERY_ALWAYS_EAGER=false
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: vantyx_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  storage_data:
     driver: local

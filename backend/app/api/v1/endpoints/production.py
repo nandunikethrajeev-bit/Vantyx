@@ -1,11 +1,13 @@
 """VANTYX Video Production & Rendering Endpoints."""
 
 import os
+from pathlib import Path
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.modules.production.service import ProductionService
 from app.schemas.production import RenderJobResponse, RenderSettingsInput
@@ -80,6 +82,14 @@ async def stream_render_job(
     job = await ProductionService.get_job(db, job_id)
     if not job or not job.output_file_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Render job or file not found")
+    
+    # Path traversal protection
+    export_dir = Path(settings.EXPORT_DIR).resolve()
+    data_dir = Path(settings.DATA_DIR).resolve()
+    target_path = Path(job.output_file_path).resolve()
+    if export_dir not in target_path.parents and data_dir not in target_path.parents and target_path != export_dir and target_path != data_dir:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: path traversal detected")
+
     if not os.path.exists(job.output_file_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rendered video file is missing on disk")
 
@@ -101,6 +111,14 @@ async def stream_render_thumbnail(
     job = await ProductionService.get_job(db, job_id)
     if not job or not job.thumbnail_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thumbnail not found")
+
+    # Path traversal protection
+    export_dir = Path(settings.EXPORT_DIR).resolve()
+    data_dir = Path(settings.DATA_DIR).resolve()
+    thumb_path = Path(job.thumbnail_path).resolve()
+    if export_dir not in thumb_path.parents and data_dir not in thumb_path.parents and thumb_path != export_dir and thumb_path != data_dir:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: path traversal detected")
+
     if not os.path.exists(job.thumbnail_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thumbnail image is missing on disk")
 

@@ -60,3 +60,19 @@
   3. **Strict Bounded Feedback Multipliers**: Feedback multipliers for content categories, duration buckets, and hook velocity are strictly clamped to $[1.0 - \text{max\_impact}, 1.0 + \text{max\_impact}]$ (default $\pm 15\%$) and require $N \ge 3$ samples.
   4. **Fail-Safe & Explainable**: The feedback engine defaults to disabled (`ANALYTICS_FEEDBACK_ENABLED=False`) and every adjusted score is transparently recorded in `CandidateClip.rationale`.
 - **Consequences**: Enables data-driven optimization without risking model drift, runaway biases, or small-sample distortions.
+
+## ADR-011: Production Hardening, Token Encryption at Rest, Multi-Aspect FFmpeg & Cloud Deployment
+- **Context**: Transitioning VANTYX into an operational platform required eliminating development shortcuts:
+  1. Silent fallback to SQLite allowed development without PostgreSQL, but in production, SQLite would lose concurrency, durability, and multi-worker safety.
+  2. OAuth refresh and access tokens stored in plaintext exposed credentials in database dumps.
+  3. Video inputs may arrive in various aspect ratios (16:9 widescreen, 21:9 ultra-wide, 4:3, or native 9:16 vertical); hardcoded 16:9 scaling distorted non-standard aspect ratios.
+  4. Background jobs required discrete worker task declarations and a persistent Beat scheduler rather than in-process execution.
+  5. Containerization required multi-service orchestration with proper health checks and persistent volume management.
+- **Decision**:
+  1. **Strict Persistence Enforcement**: `Settings.async_database_url` and `Settings.sync_database_url` enforce strict PostgreSQL validation. In production (`APP_ENV="production"` or `ENVIRONMENT="production"`), SQLite and in-memory configurations immediately raise `RuntimeError`.
+  2. **AES/Fernet Token Encryption at Rest**: Implemented `encrypt_token` and `decrypt_token` using `cryptography.fernet.Fernet`. All YouTube OAuth access and refresh tokens are encrypted before database persistence. Legacy and mock tokens are handled gracefully with zero breaking changes.
+  3. **Universal Aspect-Ratio Agnostic Filtergraph**: Implemented dynamic scaling: background scales with `force_original_aspect_ratio=increase` cropped to 1080x1920 with boxblur, foreground scales with `force_original_aspect_ratio=decrease`, and native 9:16 vertical skips blur. Implemented `cleanup_expired_storage` purging renders older than 30 days.
+  4. **Celery Worker & Scheduler Hardening**: Registered Celery background tasks in `app.tasks.*`, added daily Beat schedule at 06:00 IST (`DAILY_PIPELINE_RUN_TIME`), and enforced distributed Redis broker requirement in production.
+  5. **Readiness Telemetry**: Upgraded `/api/v1/health/ready` probe to evaluate 6 distinct subsystems: PostgreSQL, Redis broker, Celery worker heartbeat, YouTube OAuth, AI provider, and disk capacity.
+  6. **Multi-Service Cloud Containerization**: Authored production `backend/Dockerfile` (multi-stage Python 3.12-slim, system FFmpeg, non-root user `vantyx`), `frontend/Dockerfile` (Node 22 builder + Nginx Alpine reverse proxy), `infrastructure/docker-compose.yml`, and `infrastructure/docker-compose.prod.yml`.
+- **Consequences**: The platform is hardened against credential leaks, aspect ratio distortions, silent persistence degradations, and queue failures, fully ready for containerized cloud deployment.

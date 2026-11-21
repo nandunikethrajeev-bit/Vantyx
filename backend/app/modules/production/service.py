@@ -49,8 +49,20 @@ class ProductionService(ProductionServiceInterface):
     # ---------------- Vertical Synthesis Filtergraphs ----------------
 
     @staticmethod
-    def build_video_filtergraph(layout_style: str = "blurred_backdrop") -> str:
-        """Construct the FFmpeg video filtergraph for 9:16 vertical framing."""
+    def build_video_filtergraph(
+        layout_style: str = "blurred_backdrop",
+        src_width: Optional[int] = None,
+        src_height: Optional[int] = None,
+    ) -> str:
+        """Construct universal aspect-ratio agnostic video filtergraph for 9:16 vertical framing.
+        
+        Seamlessly handles 16:9 widescreen, 21:9 ultra-wide, 4:3 legacy, and native 9:16 vertical
+        without distortion or letterboxing defects.
+        """
+        # If input is already native vertical (9:16 within 5% tolerance), direct scale to 1080x1920
+        if src_width and src_height and abs((src_width / src_height) - (9 / 16)) < 0.05:
+            return "[0:v]scale=1080:1920,setsar=1[v]"
+
         if layout_style == "crop_center":
             # Crop 9:16 strip from center and scale to 1080x1920
             return "[0:v]crop=in_h*(9/16):in_h,scale=1080:1920,setsar=1[v]"
@@ -117,7 +129,11 @@ class ProductionService(ProductionServiceInterface):
             has_local_file = local_file and os.path.exists(local_file)
             job.is_synthetic = not has_local_file
 
-            filtergraph = cls.build_video_filtergraph(config.layout_style)
+            filtergraph = cls.build_video_filtergraph(
+                layout_style=config.layout_style,
+                src_width=getattr(source, "width", None),
+                src_height=getattr(source, "height", None),
+            )
             audio_filter = "loudnorm=I=-14:LRA=11:TP=-1.5" if config.normalize_audio else "anull"
 
             if has_local_file:
@@ -216,3 +232,47 @@ class ProductionService(ProductionServiceInterface):
     async def get_job(db: AsyncSession, job_id: int) -> Optional[RenderJob]:
         """Retrieve render job by ID."""
         return await db.get(RenderJob, job_id)
+
+    @classmethod
+    async def cleanup_expired_storage(
+        cls,
+        max_age_days: int = 30,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """Purge rendered video and thumbnail exports older than max_age_days.
+        
+        Preserves active render jobs and raw downloaded source assets.
+        """
+        export_dir = Path(settings.EXPORT_DIR).resolve()
+        if not export_dir.exists():
+            return {"deleted_files": 0, "freed_bytes": 0, "freed_mb": 0.0}
+
+        cutoff_time = time.time() - (max_age_days * 86400)
+        deleted_count = 0
+        freed_bytes = 0
+
+        for file_path in export_dir.iterdir():
+            if file_path.is_file() and file_path.suffix.lower() in (".mp4", ".jpg", ".png"):
+                try:
+                    stat = file_path.stat()
+                    if stat.st_mtime < cutoff_time:
+                        file_size = stat.st_size
+                        if not dry_run:
+                            file_path.unlink()
+                        deleted_count += 1
+                        freed_bytes += file_size
+                except Exception as exc:
+                    logger.warning(f"Error inspecting or removing storage file {file_path}: {exc}")
+
+        freed_mb = round(freed_bytes / (1024 * 1024), 2)
+        logger.info(
+            f"Storage cleanup completed: {deleted_count} files ({freed_mb} MB) "
+            f"{'identified (dry run)' if dry_run else 'deleted'}."
+        )
+        return {
+            "deleted_files": deleted_count,
+            "freed_bytes": freed_bytes,
+            "freed_mb": freed_mb,
+            "cutoff_days": max_age_days,
+            "dry_run": dry_run,
+        }

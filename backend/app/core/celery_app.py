@@ -1,11 +1,13 @@
 """Celery Worker & Background Job Configuration for VANTYX.
 
 Provides asynchronous task distribution with graceful in-process eager fallback
-when Redis or standalone worker daemons are not running.
+when Redis or standalone worker daemons are not running in development,
+while enforcing strict distributed broker requirements in production.
 """
 
 from typing import Any, Dict
 from celery import Celery
+from celery.schedules import crontab
 import redis
 
 from app.core.config import settings
@@ -20,6 +22,14 @@ try:
 except Exception:
     is_redis_available = False
 
+if settings.is_production:
+    if settings.CELERY_ALWAYS_EAGER:
+        raise RuntimeError("Celery eager execution mode is strictly prohibited in production mode.")
+    if not is_redis_available:
+        raise RuntimeError(
+            f"Redis broker connection required for Celery in production mode. Unreachable at {settings.REDIS_URL}"
+        )
+
 # Initialize Celery Application
 celery_app = Celery(
     "vantyx",
@@ -28,7 +38,14 @@ celery_app = Celery(
 )
 
 # Apply configuration
-eager_mode = settings.CELERY_ALWAYS_EAGER or not is_redis_available
+eager_mode = (settings.CELERY_ALWAYS_EAGER or not is_redis_available) and not settings.is_production
+
+# Parse daily run time (e.g. "06:00")
+run_hour, run_minute = 6, 0
+if settings.DAILY_PIPELINE_RUN_TIME and ":" in settings.DAILY_PIPELINE_RUN_TIME:
+    parts = settings.DAILY_PIPELINE_RUN_TIME.split(":")
+    run_hour = int(parts[0])
+    run_minute = int(parts[1]) if len(parts) > 1 else 0
 
 celery_app.conf.update(
     task_always_eager=eager_mode,
@@ -36,12 +53,66 @@ celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
-    timezone="Asia/Kolkata",
+    timezone=settings.TIMEZONE,
     enable_utc=True,
     worker_concurrency=settings.MAX_CONCURRENT_RENDERS,
     task_track_started=True,
     task_time_limit=900,  # 15 minutes max per video processing task
+    beat_schedule={
+        "vantyx-daily-autonomous-pipeline": {
+            "task": "tasks.orchestration.run_daily_pipeline",
+            "schedule": crontab(hour=run_hour, minute=run_minute),
+            "options": {"queue": "orchestration"},
+        },
+        "vantyx-daily-analytics-collection": {
+            "task": "tasks.analytics.collect_analytics",
+            "schedule": crontab(hour=(run_hour + 1) % 24, minute=run_minute),
+            "options": {"queue": "analytics"},
+        },
+    },
 )
+
+# Register background tasks across modular domains
+import app.tasks.orchestration  # noqa: F401
+import app.tasks.production     # noqa: F401
+import app.tasks.distribution   # noqa: F401
+import app.tasks.analytics      # noqa: F401
+
+
+def check_celery_worker_availability() -> Dict[str, Any]:
+    """Inspect Celery worker connectivity and return structured health details."""
+    if eager_mode:
+        return {
+            "status": "eager_development",
+            "message": "Celery running in in-process eager mode (local development/testing)",
+            "workers": [],
+            "worker_count": 0,
+        }
+    try:
+        inspector = celery_app.control.inspect(timeout=0.5)
+        ping_res = inspector.ping() if inspector else None
+        if ping_res and len(ping_res) > 0:
+            workers = list(ping_res.keys())
+            return {
+                "status": "healthy",
+                "message": f"Active distributed Celery workers: {len(workers)}",
+                "workers": workers,
+                "worker_count": len(workers),
+            }
+        return {
+            "status": "unreachable",
+            "message": "No active Celery worker processes responding to heartbeat probe",
+            "workers": [],
+            "worker_count": 0,
+        }
+    except Exception as exc:
+        return {
+            "status": "unreachable",
+            "message": f"Worker inspection error: {type(exc).__name__}",
+            "workers": [],
+            "worker_count": 0,
+        }
+
 
 logger.info(
     f"Celery initialized: mode={'EAGER (In-process)' if eager_mode else 'DISTRIBUTED (Redis)'}, "
