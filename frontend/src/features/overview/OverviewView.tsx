@@ -1,5 +1,5 @@
 import React from 'react';
-import { Server, Database, ShieldCheck, Layers, Cpu, Cloud, HardDrive } from 'lucide-react';
+import { Server, Database, ShieldCheck, Terminal, Layers, Cpu, Cloud, HardDrive } from 'lucide-react';
 import { ConnectionState, HealthResponse, ReadinessResponse } from '@/types';
 
 interface OverviewViewProps {
@@ -96,11 +96,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <Server size={14} className="text-vantyx-accent" /> Backend Core API
                 </span>
                 <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                    connectionState !== 'offline'
-                      ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
-                      : 'border-rose-500/30 text-rose-400 bg-rose-500/10'
-                  }`}
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${connectionState !== 'offline'
+                    ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                    : 'border-rose-500/30 text-rose-400 bg-rose-500/10'
+                    }`}
                 >
                   {connectionState !== 'offline' ? 'ACTIVE' : 'UNREACHABLE'}
                 </span>
@@ -143,11 +142,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <Database size={14} className="text-vantyx-accent" /> PostgreSQL Connectivity
                 </span>
                 <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                    readiness?.components.database.status === 'healthy'
-                      ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
-                      : 'border-vantyx-accent/30 text-vantyx-accent bg-vantyx-accent/10'
-                  }`}
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${readiness?.components.database.status === 'healthy'
+                    ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                    : 'border-vantyx-accent/30 text-vantyx-accent bg-vantyx-accent/10'
+                    }`}
                 >
                   {readiness?.components.database.status === 'healthy' ? 'CONNECTED' : 'STANDBY / RESILIENT'}
                 </span>
@@ -185,11 +183,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <Cpu size={14} className="text-vantyx-accent" /> Worker & Queue Broker
                 </span>
                 <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                    redisHealth?.status === 'healthy'
-                      ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
-                      : 'border-amber-500/30 text-amber-400 bg-amber-500/10'
-                  }`}
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${redisHealth?.status === 'healthy'
+                    ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                    : 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                    }`}
                 >
                   {redisHealth?.status === 'healthy' ? 'REDIS ONLINE' : 'EAGER IN-PROCESS'}
                 </span>
@@ -225,11 +222,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <Cloud size={14} className="text-vantyx-accent" /> External Integration Boundaries
                 </span>
                 <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                    readiness?.status === 'ready'
-                      ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
-                      : 'border-amber-500/30 text-amber-400 bg-amber-500/10'
-                  }`}
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${readiness?.status === 'ready'
+                    ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                    : 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                    }`}
                 >
                   {readiness?.status === 'ready' ? 'READY' : 'DEVELOPMENT MODE'}
                 </span>
