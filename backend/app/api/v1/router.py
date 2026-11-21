@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     distribution,
     health,
     intelligence,
+    orchestration,
     production,
     selection,
 )
@@ -27,3 +28,5 @@ api_router.include_router(selection.router)
 api_router.include_router(production.router)
 # Milestone 06: Distribution & Publishing Engine
 api_router.include_router(distribution.router)
+# Milestone 07: Autonomous Orchestration & End-to-End Workflow Engine
+api_router.include_router(orchestration.router, prefix="/orchestration", tags=["Orchestration"])

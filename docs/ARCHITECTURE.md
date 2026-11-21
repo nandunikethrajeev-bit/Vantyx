@@ -17,12 +17,40 @@ The backend application is divided into six core domain modules within `backend/
 
 | Module | Core Responsibility | Planned Milestone |
 | :--- | :--- | :--- |
-| **`discovery`** | Approved creator channel ingestion, commercial-use rights validation, origin metadata, and legal attribution tracking. | Milestone 02 |
-| **`intelligence`** | Multimodal AI analysis of long-form videos: scene boundary segmentation, speech transcript extraction, audio dynamics, and event tagging. | Milestone 03 |
-| **`selection`** | Moment scoring algorithms: hook candidate evaluation, viral retention potential estimation, and timestamp boundary optimization. | Milestone 04 |
-| **`production`** | Media synthesis: dynamic 9:16 vertical re-framing, typographic subtitle rendering, color grading, audio normalization, and encoding. | Milestone 05 |
-| **`distribution`** | Publishing orchestration: authorized YouTube Data API integration, release schedule queues, title/metadata generation, and release dispatch. | Milestone 06 |
-| **`analytics`** | Audience telemetry: ingestion of YouTube performance metrics (APV, retention curves) and closed-loop feedback calibration for moment selection. | Milestone 07 |
+| **`discovery`** | Approved creator channel ingestion, commercial-use rights validation, origin metadata, and legal attribution tracking. | Milestone 02 (Complete) |
+| **`intelligence`** | Multimodal AI analysis of long-form videos: scene boundary segmentation, speech transcript extraction, audio dynamics, and event tagging. | Milestone 03 (Complete) |
+| **`selection`** | Moment scoring algorithms: hook candidate evaluation, viral retention potential estimation, and timestamp boundary optimization. | Milestone 04 (Complete) |
+| **`production`** | Media synthesis: dynamic 9:16 vertical re-framing, typographic subtitle rendering, color grading, audio normalization, and encoding. | Milestone 05 (Complete) |
+| **`distribution`** | Publishing orchestration: authorized YouTube Data API integration, release schedule queues, title/metadata generation, and release dispatch. | Milestone 06 (Complete) |
+| **`orchestration`** | End-to-end autonomous pipeline, Celery background tasks, Redis/eager execution, daily 4-slot plan, and execution recovery. | Milestone 07 (Complete) |
+| **`analytics`** | Audience telemetry: ingestion of YouTube performance metrics (APV, retention curves) and closed-loop feedback calibration for moment selection. | Milestone 08 |
+
+---
+
+## 2.1 The Autonomous 7-Step Orchestration Pipeline
+
+```
+[ Step 1: Discovery ]
+       │  (Polls Atom feeds / YouTube API, registers approved gameplay sources)
+       ▼
+[ Step 2: Rights Gate ]
+       │  (Strict check: commercial rights, non-restricted editing scope, valid license)
+       ▼
+[ Step 3: Intelligence ]
+       │  (Scene segmentation, transcript extraction, action intensity & excitement scoring)
+       ▼
+[ Step 4: Selection ]
+       │  (Hook strength, retention modeling, context completeness, duplicate rejection)
+       ▼
+[ Step 5: Production ]
+       │  (FFmpeg 9:16 vertical synthesis, 20px blurred backdrop, EBU R128 audio normalization)
+       ▼
+[ Step 6: Distribution ]
+       │  (Publishing gate, blocks synthetic media, schedules across 4 daily slots in Asia/Kolkata)
+       ▼
+[ Step 7: Monitoring ]
+          (Audits slot fulfillment (4/4 daily quota), summarizes logs, tracks operational health)
+```
 
 ### Interservice Communication Rules
 - Modules must communicate through explicit service interfaces (`service.py`), not by querying foreign database tables directly.

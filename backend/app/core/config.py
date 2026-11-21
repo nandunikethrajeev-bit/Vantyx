@@ -99,6 +99,16 @@ class Settings(BaseSettings):
         description="Daily Shorts publication release schedule in local timezone",
     )
 
+    # Orchestration, Redis & Background Worker Settings
+    REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL for queue coordination")
+    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0", description="Celery broker URL")
+    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/1", description="Celery result backend URL")
+    CELERY_ALWAYS_EAGER: bool = Field(default=True, description="Execute Celery tasks in-process for test environments and zero-redis fallback")
+    ORCHESTRATION_ENABLED: bool = Field(default=False, description="Master automation toggle (requires explicit operator activation)")
+    DAILY_PIPELINE_RUN_TIME: str = Field(default="06:00", description="Daily workflow trigger time in Asia/Kolkata timezone")
+    MAX_CONCURRENT_RENDERS: int = Field(default=2, description="Maximum concurrent video render jobs")
+    WORKFLOW_RETRY_LIMIT: int = Field(default=3, description="Maximum retries for recoverable workflow steps")
+
     # Media & Rendering Tools
     FFMPEG_PATH: Optional[str] = Field(
         default=None,

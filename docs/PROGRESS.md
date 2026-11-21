@@ -174,3 +174,52 @@
     - **40 backend tests passing** (100% pass rate across all unit and integration tests).
     - **19 frontend tests passing** (100% pass rate across 8 test suites).
     - Frontend production build (`tsc -b && vite build`) passing cleanly.
+
+---
+
+## Milestone 07: Autonomous Orchestration & End-to-End Workflow Engine
+- **Status**: COMPLETE & VERIFIED
+- **Key Deliverables**:
+  - **Persistent Multi-Stage Orchestration Engine**:
+    - End-to-end integration connecting all 6 prior modules into a unified autonomous pipeline:
+      1. **Discovery**: Queries approved creators, atom feeds/YouTube API, deduplicates.
+      2. **Rights Validation**: Commercial-use verification, expiration check, editing scope validation.
+      3. **Intelligence**: Scene segmentation, excitement & action intensity scoring (Gemini / Heuristic).
+      4. **Selection**: Multi-factor candidate ranking, timestamp overlap prevention, duplicate moment rejection.
+      5. **Production**: 9:16 vertical video synthesis with blurred backdrop, EBU R128 audio normalization, thumbnail extraction, synthetic media tracking.
+      6. **Distribution**: Legal publishing gate, synthetic media blocker, Asia/Kolkata 4-slot assignment (09:00, 13:00, 17:00, 21:00), scheduled YouTube upload.
+      7. **Monitoring**: Evaluates plan fulfillment (4/4 daily target), reports unfilled slots, generates operational telemetry.
+  - **Persistent Execution State**:
+    - Relational database schema with models `WorkflowRun`, `WorkflowStep`, `BackgroundJob`, `JobAttempt`, `JobExecutionLog`, and `DailyPublishingPlan`.
+    - Workflows survive process and worker restarts with automatic recovery (`POST /api/v1/orchestration/recover`).
+    - Full step-by-step audit trail with duration, error details, and execution metadata.
+  - **Celery & Redis Worker Integration with Eager Fallback**:
+    - Configured in `app.core.celery_app`.
+    - Dynamic broker probe: uses Redis when active; seamlessly falls back to eager in-process execution (`task_always_eager=True`) for zero-daemon development and testing.
+  - **Production Throttling & Safety Controls**:
+    - CPU-aware rendering concurrency throttle (`MAX_CONCURRENT_RENDERS=2`).
+    - Minimum disk space verification (`shutil.disk_usage >= 1.0 GB`) before rendering.
+    - Master automation switch defaults to disabled (`ORCHESTRATION_ENABLED=False`) until explicitly enabled by operator.
+  - **REST Endpoints**:
+    - `GET /api/v1/orchestration/status` (Retrieves automation master switch, worker status, and active run summary).
+    - `PATCH /api/v1/orchestration/config` (Updates master toggle, run time, and concurrent render limit).
+    - `POST /api/v1/orchestration/start` (Manually triggers full autonomous pipeline run).
+    - `GET /api/v1/orchestration/workflows/current` (Retrieves active workflow run with all 7 step states).
+    - `GET /api/v1/orchestration/workflows` (Paginated workflow execution history).
+    - `GET /api/v1/orchestration/workflows/{id}` (Workflow details with all step logs).
+    - `POST /api/v1/orchestration/workflows/{id}/pause` (Pauses in-flight workflow).
+    - `POST /api/v1/orchestration/workflows/{id}/resume` (Resumes paused workflow).
+    - `POST /api/v1/orchestration/workflows/{id}/cancel` (Cancels workflow run).
+    - `GET /api/v1/orchestration/plan` (Retrieves daily 4-slot publishing plan in Asia/Kolkata).
+    - `POST /api/v1/orchestration/recover` (Recovers stalled in-flight workflows after restarts).
+  - **Interactive Frontend Workspace**:
+    - Dedicated `OrchestrationView` mounted in sidebar with `Activity` icon and `M07 ACTIVE` badge.
+    - Master Automation Toggle banner with schedule time and real-time status.
+    - System Resource & Health gauges (Active Step, Worker State, Target Quota).
+    - Live 7-Stage Pipeline Visualizer with state icons, durations, and details.
+    - Daily 4-Slot Release Plan card for target channel **Astro Rebel** (`09:00`, `13:00`, `17:00`, `21:00`).
+    - Dual-tab Execution History and Live Telemetry Log viewer.
+  - **Test Suite**:
+    - **49 backend tests passing** (100% pass rate across all unit and integration suites).
+    - **22 frontend tests passing** (100% pass rate across 9 test suites).
+    - Frontend production build (`tsc -b && vite build`) passing with zero errors.

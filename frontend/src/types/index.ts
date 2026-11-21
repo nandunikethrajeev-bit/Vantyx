@@ -5,6 +5,7 @@ export type NavigationSection =
   | 'selection'
   | 'production'
   | 'distribution'
+  | 'orchestration'
   | 'analytics'
   | 'settings';
 
@@ -262,4 +263,71 @@ export interface PublishTriggerResponse {
   is_mock: boolean;
   message: string;
 }
+
+// ---------------- Orchestration & Autonomous Workflow ----------------
+
+export interface WorkflowStep {
+  id: number;
+  step_name: string;
+  step_order: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  started_at?: string | null;
+  completed_at?: string | null;
+  error_details?: string | null;
+  output_data?: Record<string, any> | null;
+}
+
+export interface JobExecutionLog {
+  id: number;
+  workflow_run_id?: number | null;
+  job_id?: number | null;
+  level: string;
+  message: string;
+  context_data?: Record<string, any> | null;
+  timestamp: string;
+}
+
+export interface WorkflowRun {
+  id: number;
+  run_id: string;
+  workflow_type: string;
+  target_date: string;
+  status: 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'paused';
+  current_step: string;
+  started_at: string;
+  completed_at?: string | null;
+  error_details?: string | null;
+  retry_count: number;
+  execution_metadata?: Record<string, any> | null;
+  steps: WorkflowStep[];
+  logs: JobExecutionLog[];
+}
+
+export interface DailyPublishingPlan {
+  id: number;
+  plan_date: string;
+  timezone: string;
+  status: 'planning' | 'ready' | 'in_progress' | 'fulfilled' | 'partial' | 'unfulfilled';
+  target_count: number;
+  filled_count: number;
+  slot_assignments?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AutomationStatus {
+  automation_enabled: boolean;
+  daily_run_time_ist: string;
+  timezone: string;
+  celery_mode: 'eager' | 'distributed';
+  redis_connected: boolean;
+  active_worker_count: number;
+  max_concurrent_renders: number;
+  current_workflow_id?: string | null;
+  today_plan_status?: string | null;
+  filled_slots_today: number;
+  next_scheduled_run?: string | null;
+  disk_free_gb: number;
+}
+
 

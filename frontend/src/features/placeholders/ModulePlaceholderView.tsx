@@ -76,6 +76,17 @@ const MODULE_DETAILS: Record<
       'Publication confirmation and permalink tracking',
     ],
   },
+  orchestration: {
+    name: 'Orchestration Module',
+    milestone: 'Milestone 07',
+    description: 'Persistent autonomous execution and 7-stage workflow pipeline.',
+    plannedResponsibilities: [
+      'Redis & Celery background job coordination',
+      '7-stage sequential pipeline execution',
+      'Daily 4-slot publishing plan in Asia/Kolkata',
+      'Automatic worker recovery and restart resiliency',
+    ],
+  },
   analytics: {
     name: 'Analytics Module',
     milestone: 'Milestone 07',

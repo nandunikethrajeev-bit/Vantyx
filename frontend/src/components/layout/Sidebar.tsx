@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Database,
   Server,
+  Activity,
 } from 'lucide-react';
 import { NavigationSection, ConnectionState } from '@/types';
 import { BrandMark } from '../ui/BrandMark';
@@ -33,12 +34,13 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'orchestration', label: 'Orchestration', icon: Activity, badge: 'M07' },
   { id: 'discovery', label: 'Discovery', icon: Radio, badge: 'M02' },
   { id: 'intelligence', label: 'Intelligence', icon: Cpu, badge: 'M03' },
   { id: 'selection', label: 'Selection', icon: Sparkles, badge: 'M04' },
   { id: 'production', label: 'Production', icon: Scissors, badge: 'M05' },
   { id: 'distribution', label: 'Distribution', icon: Share2, badge: 'M06' },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, badge: 'M07' },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 

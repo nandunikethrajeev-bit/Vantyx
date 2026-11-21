@@ -119,17 +119,42 @@ To enable live autonomous publishing to the **Astro Rebel** YouTube channel:
 
 ---
 
-## 5. Testing & Verification
+## 5. Background Workers & Autonomous Orchestration
+
+VANTYX uses Celery for background asynchronous execution and Redis for transient queue coordination.
+
+### Celery Eager Execution vs Redis Worker
+- By default or when Redis is offline, `CELERY_ALWAYS_EAGER=True` executes tasks in-process synchronously. Zero external daemons are required for development, CI/CD, or automated testing.
+- For production multi-process execution:
+  ```bash
+  # Start Celery worker in backend directory
+  cd backend
+  celery -A app.core.celery_app worker --loglevel=info --concurrency=2
+  ```
+
+### Master Automation Switch
+Automation is disabled by default for safety (`ORCHESTRATION_ENABLED=False`).
+- Enable via UI: Toggle the master switch in the **Orchestration** workspace.
+- Enable via API:
+  ```bash
+  curl -X PATCH http://127.0.0.1:8000/api/v1/orchestration/config \
+       -H "Content-Type: application/json" \
+       -d '{"orchestration_enabled": true}'
+  ```
+
+---
+
+## 6. Testing & Verification
 
 ### Run Backend Unit & Integration Tests
 ```bash
-# Run full suite (40 tests)
+# Run full suite (49 tests)
 backend\.venv\Scripts\pytest -v backend/tests/
 ```
 
 ### Run Frontend Unit Tests & Production Build
 ```bash
-# Run unit tests (19 tests)
+# Run unit tests (22 tests across 9 suites)
 npm test --prefix frontend -- --run
 
 # Run TypeScript production build

@@ -1,7 +1,9 @@
 import {
   AnalysisJob,
+  AutomationStatus,
   CandidateClip,
   Creator,
+  DailyPublishingPlan,
   DailySelectionResponse,
   DailySlotsResponse,
   DiscoveryRunResult,
@@ -16,6 +18,7 @@ import {
   RightsRecord,
   VideoScene,
   VideoSource,
+  WorkflowRun,
   YouTubeAccount,
 } from '@/types';
 
@@ -339,4 +342,77 @@ export async function triggerPublish(
     }
   );
 }
+
+// ---------------- Orchestration & Automation API ----------------
+
+export async function fetchAutomationStatus(): Promise<AutomationStatus> {
+  return await request<AutomationStatus>('/api/v1/orchestration/status');
+}
+
+export async function updateAutomationConfig(data: {
+  automation_enabled?: boolean;
+  daily_run_time_ist?: string;
+  max_concurrent_renders?: number;
+}): Promise<AutomationStatus> {
+  return await request<AutomationStatus>('/api/v1/orchestration/config', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function startWorkflow(data: {
+  target_date?: string;
+  force?: boolean;
+  execute_sync?: boolean;
+} = {}): Promise<WorkflowRun> {
+  return await request<WorkflowRun>('/api/v1/orchestration/start', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchCurrentWorkflow(): Promise<WorkflowRun | null> {
+  return await request<WorkflowRun | null>('/api/v1/orchestration/workflows/current');
+}
+
+export async function fetchWorkflowHistory(limit = 20, status?: string): Promise<WorkflowRun[]> {
+  let url = `/api/v1/orchestration/workflows?limit=${limit}`;
+  if (status) url += `&status=${status}`;
+  return await request<WorkflowRun[]>(url);
+}
+
+export async function getWorkflowDetails(runId: string): Promise<WorkflowRun> {
+  return await request<WorkflowRun>(`/api/v1/orchestration/workflows/${runId}`);
+}
+
+export async function pauseWorkflow(runId: string): Promise<WorkflowRun> {
+  return await request<WorkflowRun>(`/api/v1/orchestration/workflows/${runId}/pause`, {
+    method: 'POST',
+  });
+}
+
+export async function resumeWorkflow(runId: string): Promise<WorkflowRun> {
+  return await request<WorkflowRun>(`/api/v1/orchestration/workflows/${runId}/resume`, {
+    method: 'POST',
+  });
+}
+
+export async function cancelWorkflow(runId: string): Promise<WorkflowRun> {
+  return await request<WorkflowRun>(`/api/v1/orchestration/workflows/${runId}/cancel`, {
+    method: 'POST',
+  });
+}
+
+export async function fetchDailyPublishingPlan(targetDate?: string): Promise<DailyPublishingPlan> {
+  let url = '/api/v1/orchestration/plan';
+  if (targetDate) url += `?target_date=${targetDate}`;
+  return await request<DailyPublishingPlan>(url);
+}
+
+export async function triggerWorkflowRecovery(): Promise<{ recovered_count: number; message: string }> {
+  return await request<{ recovered_count: number; message: string }>('/api/v1/orchestration/recover', {
+    method: 'POST',
+  });
+}
+
 

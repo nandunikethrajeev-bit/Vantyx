@@ -38,3 +38,16 @@
 - **Context**: Google OAuth 2.0 authorization requires external user consent and Google Cloud Console developer credentials. In CI/CD pipelines, automated testing, or offline sandbox environments, external YouTube network calls cannot and should not be made.
 - **Decision**: Implemented `MockPublishingProvider` in `DistributionService`. When `MOCK_YOUTUBE_PUBLISHING=True` or `force_mock=True`, the publishing engine simulates the full chunked upload lifecycle, records telemetry in `UploadJob`, generates a clearly flagged `mock_yt_{id}` identifier, marks `is_mock=True`, and sets the schedule status to `published`.
 - **Consequences**: Full end-to-end integration testing and automated verification without making external network calls or requiring active Google OAuth credentials.
+
+## ADR-008: Persistent Multi-Stage Orchestration Architecture with Eager Queue Fallback
+- **Context**: Autonomous orchestration coordinates 6 subsystems across 7 sequential stages (Discovery, Rights, Intelligence, Selection, Production, Distribution, Monitoring). If a broker like Redis is offline during local development or unit testing, asynchronous queue operations must not fail or stall.
+- **Decision**: Implemented Celery worker integration (`app.core.celery_app`) with dynamic broker detection. If Redis responds on port 6379, it uses Redis. If Redis is unavailable or `CELERY_ALWAYS_EAGER=True`, Celery operates in eager synchronous mode (`task_always_eager=True`). All execution state is persisted directly in PostgreSQL/SQLite (`WorkflowRun`, `WorkflowStep`, `BackgroundJob`, `JobAttempt`, `JobExecutionLog`, `DailyPublishingPlan`) rather than relying on in-memory queue state.
+- **Consequences**: Complete pipeline resiliency. Workflows survive process restarts, can be paused/cancelled/recovered deterministically, and test suites execute with zero daemon dependencies.
+
+## ADR-009: Production Throttling and Resource Safeguards
+- **Context**: 9:16 vertical video synthesis (FFmpeg scaling, boxblur background filtering, EBU R128 audio normalization) is compute and disk intensive. Unconstrained rendering could exhaust system memory or disk space.
+- **Decision**: Implemented strict resource limits in `OrchestrationService`:
+  1. `MAX_CONCURRENT_RENDERS: int = 2` throttles simultaneous render jobs.
+  2. Free disk space is verified before render operations using `shutil.disk_usage` (minimum 1.0 GB required).
+  3. Master automation kill-switch (`ORCHESTRATION_ENABLED: bool = False`) defaults to disabled, requiring explicit operator enablement.
+- **Consequences**: Prevents CPU spikes, memory exhaustion, and out-of-disk failures during autonomous batches.

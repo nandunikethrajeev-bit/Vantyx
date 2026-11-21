@@ -36,9 +36,13 @@ const SECTION_TITLES: Record<NavigationSection, { title: string; subtitle: strin
     title: 'Channel Distribution',
     subtitle: 'Release queues and authorized publishing pipelines (Milestone 06)',
   },
+  orchestration: {
+    title: 'Autonomous Orchestration',
+    subtitle: 'Persistent end-to-end execution and 7-stage workflow pipeline (Milestone 07)',
+  },
   analytics: {
     title: 'Audience Intelligence',
-    subtitle: 'Retention metrics and feedback loop optimization (Milestone 07)',
+    subtitle: 'Retention metrics and feedback loop optimization (Milestone 08)',
   },
   settings: {
     title: 'System Configuration',
