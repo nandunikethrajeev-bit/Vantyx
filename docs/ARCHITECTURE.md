@@ -23,7 +23,7 @@ The backend application is divided into six core domain modules within `backend/
 | **`production`** | Media synthesis: dynamic 9:16 vertical re-framing, typographic subtitle rendering, color grading, audio normalization, and encoding. | Milestone 05 (Complete) |
 | **`distribution`** | Publishing orchestration: authorized YouTube Data API integration, release schedule queues, title/metadata generation, and release dispatch. | Milestone 06 (Complete) |
 | **`orchestration`** | End-to-end autonomous pipeline, Celery background tasks, Redis/eager execution, daily 4-slot plan, and execution recovery. | Milestone 07 (Complete) |
-| **`analytics`** | Audience telemetry: ingestion of YouTube performance metrics (APV, retention curves) and closed-loop feedback calibration for moment selection. | Milestone 08 |
+| **`analytics`** | Audience telemetry: ingestion of YouTube performance metrics (APV, retention curves) and closed-loop feedback calibration for moment selection. | Milestone 08 (Complete) |
 
 ---
 
@@ -39,10 +39,21 @@ The backend application is divided into six core domain modules within `backend/
 [ Step 3: Intelligence ]
        │  (Scene segmentation, transcript extraction, action intensity & excitement scoring)
        ▼
-[ Step 4: Selection ]
-       │  (Hook strength, retention modeling, context completeness, duplicate rejection)
-       ▼
-[ Step 5: Production ]
+[ Step 4: Selection ] <────────────────────────────────────────────────┐
+       │  (Hook strength, retention modeling, context completeness)    │ (Closed-Loop
+       ▼                                                               │  Bounded Feedback)
+[ Step 5: Production ]                                                 │
+       │  (FFmpeg 9:16 vertical synthesis, 20px blurred backdrop)      │
+       ▼                                                               │
+[ Step 6: Distribution ]                                               │
+       │  (Publishing gate, schedules 4 daily slots in Asia/Kolkata)   │
+       ▼                                                               │
+[ Step 7: Monitoring ]                                                 │
+       │  (Audits slot fulfillment (4/4 quota), logs telemetry)        │
+       ▼                                                               │
+[ Milestone 08: Analytics & Performance Intelligence ] ────────────────┘
+          (Ingests YouTube Analytics, calculates RRI, generates calibrated modifiers)
+```
        │  (FFmpeg 9:16 vertical synthesis, 20px blurred backdrop, EBU R128 audio normalization)
        ▼
 [ Step 6: Distribution ]

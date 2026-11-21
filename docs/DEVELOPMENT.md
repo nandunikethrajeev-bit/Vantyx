@@ -148,13 +148,13 @@ Automation is disabled by default for safety (`ORCHESTRATION_ENABLED=False`).
 
 ### Run Backend Unit & Integration Tests
 ```bash
-# Run full suite (49 tests)
+# Run full suite (58 tests across all modules)
 backend\.venv\Scripts\pytest -v backend/tests/
 ```
 
 ### Run Frontend Unit Tests & Production Build
 ```bash
-# Run unit tests (22 tests across 9 suites)
+# Run unit tests (25 tests across 10 suites)
 npm test --prefix frontend -- --run
 
 # Run TypeScript production build

@@ -246,11 +246,10 @@ export const OrchestrationView: React.FC = () => {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-4">
             <div
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border shadow-inner ${
-                statusData?.automation_enabled
-                  ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-400'
-                  : 'border-slate-700 bg-slate-800/40 text-slate-400'
-              }`}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border shadow-inner ${statusData?.automation_enabled
+                ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-400'
+                : 'border-slate-700 bg-slate-800/40 text-slate-400'
+                }`}
             >
               <Activity className="h-6 w-6" />
             </div>
@@ -282,11 +281,10 @@ export const OrchestrationView: React.FC = () => {
             <button
               onClick={handleToggleAutomation}
               disabled={actionInFlight}
-              className={`rounded px-4 py-2 text-xs font-medium transition ${
-                statusData?.automation_enabled
-                  ? 'border border-amber-500/40 bg-amber-950/20 text-amber-300 hover:bg-amber-900/30'
-                  : 'border border-emerald-500/40 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-900/30'
-              }`}
+              className={`rounded px-4 py-2 text-xs font-medium transition ${statusData?.automation_enabled
+                ? 'border border-amber-500/40 bg-amber-950/20 text-amber-300 hover:bg-amber-900/30'
+                : 'border border-emerald-500/40 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-900/30'
+                }`}
             >
               {statusData?.automation_enabled ? 'Disable Automation' : 'Enable Automation'}
             </button>
@@ -366,13 +364,12 @@ export const OrchestrationView: React.FC = () => {
               </p>
             </div>
             <span
-              className={`rounded px-2.5 py-1 text-xs font-mono uppercase font-medium border ${
-                dailyPlan.status === 'fulfilled'
-                  ? 'border-emerald-500/40 bg-emerald-950/30 text-emerald-400'
-                  : dailyPlan.status === 'partial'
+              className={`rounded px-2.5 py-1 text-xs font-mono uppercase font-medium border ${dailyPlan.status === 'fulfilled'
+                ? 'border-emerald-500/40 bg-emerald-950/30 text-emerald-400'
+                : dailyPlan.status === 'partial'
                   ? 'border-amber-500/40 bg-amber-950/30 text-amber-400'
                   : 'border-slate-700 bg-slate-800 text-slate-400'
-              }`}
+                }`}
             >
               {dailyPlan.status} ({dailyPlan.filled_count}/4)
             </span>
@@ -386,24 +383,22 @@ export const OrchestrationView: React.FC = () => {
               return (
                 <div
                   key={slotTime}
-                  className={`rounded border p-4 transition ${
-                    isFilled
-                      ? 'border-vantyx-accent/40 bg-vantyx-accent/5'
-                      : 'border-vantyx-border/60 bg-black/20'
-                  }`}
+                  className={`rounded border p-4 transition ${isFilled
+                    ? 'border-vantyx-accent/40 bg-vantyx-accent/5'
+                    : 'border-vantyx-border/60 bg-black/20'
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-sm font-semibold text-white">
                       {slotTime} IST
                     </span>
                     <span
-                      className={`rounded px-2 py-0.5 text-[10px] font-mono uppercase border ${
-                        slot.status === 'published'
-                          ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-400'
-                          : slot.status === 'scheduled'
+                      className={`rounded px-2 py-0.5 text-[10px] font-mono uppercase border ${slot.status === 'published'
+                        ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-400'
+                        : slot.status === 'scheduled'
                           ? 'border-vantyx-accent/40 bg-vantyx-accent/20 text-vantyx-accent'
                           : 'border-slate-700 bg-slate-800/40 text-slate-400'
-                      }`}
+                        }`}
                     >
                       {slot.status || 'unfilled'}
                     </span>
@@ -440,15 +435,14 @@ export const OrchestrationView: React.FC = () => {
                   Active Workflow: <span className="font-mono text-vantyx-accent">{currentWorkflow.run_id}</span>
                 </h3>
                 <span
-                  className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase border ${
-                    currentWorkflow.status === 'completed'
-                      ? 'border-emerald-500/40 bg-emerald-950/30 text-emerald-400'
-                      : currentWorkflow.status === 'running'
+                  className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase border ${currentWorkflow.status === 'completed'
+                    ? 'border-emerald-500/40 bg-emerald-950/30 text-emerald-400'
+                    : currentWorkflow.status === 'running'
                       ? 'border-vantyx-accent/40 bg-vantyx-accent/20 text-vantyx-accent animate-pulse'
                       : currentWorkflow.status === 'paused'
-                      ? 'border-amber-500/40 bg-amber-950/30 text-amber-400'
-                      : 'border-red-500/40 bg-red-950/30 text-red-400'
-                  }`}
+                        ? 'border-amber-500/40 bg-amber-950/30 text-amber-400'
+                        : 'border-red-500/40 bg-red-950/30 text-red-400'
+                    }`}
                 >
                   {currentWorkflow.status}
                 </span>
@@ -505,28 +499,26 @@ export const OrchestrationView: React.FC = () => {
               return (
                 <div
                   key={stage.key}
-                  className={`rounded-lg border p-3 flex flex-col justify-between transition ${
-                    isCompleted
-                      ? 'border-emerald-500/40 bg-emerald-950/20'
-                      : isRunning
+                  className={`rounded-lg border p-3 flex flex-col justify-between transition ${isCompleted
+                    ? 'border-emerald-500/40 bg-emerald-950/20'
+                    : isRunning
                       ? 'border-vantyx-accent bg-vantyx-accent/10 shadow-lg'
                       : isFailed
-                      ? 'border-red-500/40 bg-red-950/20'
-                      : 'border-vantyx-border/40 bg-black/20 opacity-70'
-                  }`}
+                        ? 'border-red-500/40 bg-red-950/20'
+                        : 'border-vantyx-border/40 bg-black/20 opacity-70'
+                    }`}
                 >
                   <div>
                     <div className="flex items-center justify-between">
                       <Icon
-                        className={`h-4 w-4 ${
-                          isCompleted
-                            ? 'text-emerald-400'
-                            : isRunning
+                        className={`h-4 w-4 ${isCompleted
+                          ? 'text-emerald-400'
+                          : isRunning
                             ? 'text-vantyx-accent animate-pulse'
                             : isFailed
-                            ? 'text-red-400'
-                            : 'text-slate-500'
-                        }`}
+                              ? 'text-red-400'
+                              : 'text-slate-500'
+                          }`}
                       />
                       {isCompleted && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
                       {isRunning && <RefreshCw className="h-3.5 w-3.5 text-vantyx-accent animate-spin" />}
@@ -535,15 +527,14 @@ export const OrchestrationView: React.FC = () => {
                     <p className="mt-2 text-xs font-medium text-white">{stage.label}</p>
                   </div>
                   <span
-                    className={`mt-3 text-[10px] font-mono uppercase ${
-                      isCompleted
-                        ? 'text-emerald-400'
-                        : isRunning
+                    className={`mt-3 text-[10px] font-mono uppercase ${isCompleted
+                      ? 'text-emerald-400'
+                      : isRunning
                         ? 'text-vantyx-accent font-semibold'
                         : isFailed
-                        ? 'text-red-400'
-                        : 'text-slate-500'
-                    }`}
+                          ? 'text-red-400'
+                          : 'text-slate-500'
+                      }`}
                   >
                     {matchedStep?.status || 'pending'}
                   </span>
@@ -559,33 +550,30 @@ export const OrchestrationView: React.FC = () => {
         <div className="flex items-center gap-4 border-b border-vantyx-border">
           <button
             onClick={() => setActiveTab('current')}
-            className={`flex items-center gap-2 border-b-2 pb-3 text-xs font-medium transition ${
-              activeTab === 'current'
-                ? 'border-vantyx-accent text-vantyx-accent'
-                : 'border-transparent text-vantyx-textSecondary hover:text-white'
-            }`}
+            className={`flex items-center gap-2 border-b-2 pb-3 text-xs font-medium transition ${activeTab === 'current'
+              ? 'border-vantyx-accent text-vantyx-accent'
+              : 'border-transparent text-vantyx-textSecondary hover:text-white'
+              }`}
           >
             <Activity className="h-4 w-4" />
             Workflow Telemetry
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-2 border-b-2 pb-3 text-xs font-medium transition ${
-              activeTab === 'history'
-                ? 'border-vantyx-accent text-vantyx-accent'
-                : 'border-transparent text-vantyx-textSecondary hover:text-white'
-            }`}
+            className={`flex items-center gap-2 border-b-2 pb-3 text-xs font-medium transition ${activeTab === 'history'
+              ? 'border-vantyx-accent text-vantyx-accent'
+              : 'border-transparent text-vantyx-textSecondary hover:text-white'
+              }`}
           >
             <Layers className="h-4 w-4" />
             Execution History ({history.length})
           </button>
           <button
             onClick={() => setActiveTab('logs')}
-            className={`flex items-center gap-2 border-b-2 pb-3 text-xs font-medium transition ${
-              activeTab === 'logs'
-                ? 'border-vantyx-accent text-vantyx-accent'
-                : 'border-transparent text-vantyx-textSecondary hover:text-white'
-            }`}
+            className={`flex items-center gap-2 border-b-2 pb-3 text-xs font-medium transition ${activeTab === 'logs'
+              ? 'border-vantyx-accent text-vantyx-accent'
+              : 'border-transparent text-vantyx-textSecondary hover:text-white'
+              }`}
           >
             <Terminal className="h-4 w-4" />
             Live Execution Logs
@@ -633,13 +621,12 @@ export const OrchestrationView: React.FC = () => {
                       <td className="py-3 font-mono">{run.target_date}</td>
                       <td className="py-3">
                         <span
-                          className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase border ${
-                            run.status === 'completed'
-                              ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-400'
-                              : run.status === 'running'
+                          className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase border ${run.status === 'completed'
+                            ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-400'
+                            : run.status === 'running'
                               ? 'border-vantyx-accent/40 bg-vantyx-accent/20 text-vantyx-accent'
                               : 'border-red-500/30 bg-red-950/40 text-red-400'
-                          }`}
+                            }`}
                         >
                           {run.status}
                         </span>
@@ -651,10 +638,10 @@ export const OrchestrationView: React.FC = () => {
                       <td className="py-3 text-slate-400">
                         {run.completed_at
                           ? `${Math.round(
-                              (new Date(run.completed_at).getTime() -
-                                new Date(run.started_at).getTime()) /
-                                1000
-                            )}s`
+                            (new Date(run.completed_at).getTime() -
+                              new Date(run.started_at).getTime()) /
+                            1000
+                          )}s`
                           : 'In flight'}
                       </td>
                     </tr>
@@ -675,13 +662,12 @@ export const OrchestrationView: React.FC = () => {
                     [{new Date(log.timestamp).toLocaleTimeString()}]
                   </span>
                   <span
-                    className={`font-semibold shrink-0 ${
-                      log.level === 'ERROR'
-                        ? 'text-red-400'
-                        : log.level === 'WARNING'
+                    className={`font-semibold shrink-0 ${log.level === 'ERROR'
+                      ? 'text-red-400'
+                      : log.level === 'WARNING'
                         ? 'text-amber-400'
                         : 'text-vantyx-accent'
-                    }`}
+                      }`}
                   >
                     [{log.level}]
                   </span>
@@ -699,3 +685,4 @@ export const OrchestrationView: React.FC = () => {
 };
 
 export default OrchestrationView;
+

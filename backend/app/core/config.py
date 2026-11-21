@@ -99,6 +99,13 @@ class Settings(BaseSettings):
         description="Daily Shorts publication release schedule in local timezone",
     )
 
+    # Analytics & Feedback Engine Settings
+    MOCK_YOUTUBE_ANALYTICS: bool = Field(default=True, description="Enable simulated analytics provider for safe offline test execution")
+    ANALYTICS_FEEDBACK_ENABLED: bool = Field(default=False, description="Enable closed-loop feedback engine into moment selection")
+    ANALYTICS_FEEDBACK_MAX_IMPACT: float = Field(default=0.15, description="Maximum bounded percentage impact (+/- 15%) from analytics feedback")
+    ANALYTICS_MIN_SAMPLE_SIZE: int = Field(default=3, description="Minimum sample size required to apply feedback adjustments")
+    ANALYTICS_REPORTING_DELAY_HOURS: int = Field(default=48, description="Standard processing delay window for YouTube Analytics API")
+
     # Orchestration, Redis & Background Worker Settings
     REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL for queue coordination")
     CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0", description="Celery broker URL")

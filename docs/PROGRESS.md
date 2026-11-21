@@ -223,3 +223,44 @@
     - **49 backend tests passing** (100% pass rate across all unit and integration suites).
     - **22 frontend tests passing** (100% pass rate across 9 test suites).
     - Frontend production build (`tsc -b && vite build`) passing with zero errors.
+
+---
+
+## Milestone 08: Analytics Intelligence & Performance Feedback Engine
+- **Status**: COMPLETE & VERIFIED
+- **Key Deliverables**:
+  - **YouTube Analytics Data Ingestion**:
+    - Integrated YouTube Analytics API with OAuth scopes (`https://www.googleapis.com/auth/yt-analytics.readonly`).
+    - Verified mock analytics provider (`MockAnalyticsProvider`) for safe offline development, test runs, and deterministic testing.
+    - Captures views, likes, comments, shares, subscribers gained, average view duration (AVD), average view percentage (AVP), estimated watch time, and 10-point normalized audience retention curves.
+    - Explicit detection and handling of YouTube Analytics 24-48h reporting lag (`is_delayed_reporting=True`, status `delayed`).
+  - **Relational Analytics Models & Historical Snapshots**:
+    - `ChannelAnalyticsSnapshot`: Periodic channel-level benchmark history with 14-day trend tracking.
+    - `VideoAnalyticsSnapshot`: Time-series performance telemetry per published Short with date deduplication.
+    - `ClipPerformanceProfile`: Derived analytical profile computing Relative Retention Index (RRI), hook retention rate, content category, and duration buckets.
+    - `AnalyticsCollectionJob`: Audit trail of scheduled and manual collection sweeps with probe counts, snapshot tallies, and error logs.
+    - `PerformanceMetrics`: Aggregated benchmark models across rolling observation windows.
+  - **Multidimensional Performance Intelligence**:
+    - **Hook Efficacy Analysis**: Evaluates high-action ($\ge 75$) vs moderate hooks and early retention drop-off resistance.
+    - **Duration Sweet Spot Analysis**: Compares 15-25s, 25-35s, 35-45s, 45-60s Shorts with sample size ($N$) context.
+    - **Content Category Affinity**: Measures relative performance across GTA 6 themes (Heists, Police Chases, Stunts, Combat, General).
+    - **Publishing Slot Performance**: Compares 09:00, 13:00, 17:00, 21:00 IST release windows with exposure normalization.
+    - **Correlation vs Causation Guardrails**: Explicitly accounts for video age, platform distribution surfaces, and sample size imbalances; displays confidence pills (`low` for $N < 3$, `medium` for $3 \le N < 10$, `high` for $N \ge 10$).
+  - **Calibrated Closed-Loop Feedback into Selection**:
+    - Seamlessly connects analytics back to `SelectionService.calculate_scores` and `generate_candidates_for_source`.
+    - Computes category and duration multipliers strictly clamped to $\pm 15\%$ ($[0.85, 1.15]$) to prevent model drift or small-sample distortion.
+    - Requires $N \ge 3$ samples to apply modifiers; defaults to neutral $1.00$ otherwise.
+    - Fully explainable: transparently appends feedback modifiers to `CandidateClip.rationale`.
+    - Fail-safe toggle: defaults to disabled (`ANALYTICS_FEEDBACK_ENABLED=False`) and can be enabled/configured via API or UI.
+  - **Interactive Frontend Analytics Workspace**:
+    - Dedicated `AnalyticsView` with dark cinematic aesthetic.
+    - Channel KPI summary cards (Total Views, Avg AVP, Estimated Watch Time, Subscribers Gained).
+    - Closed-Loop Feedback Engine control banner with live multiplier chips and toggle action.
+    - 4-card Statistical Performance Intelligence grid with $N$ badges and confidence pills.
+    - Methodological Correlation vs Causation alert banner.
+    - Published Shorts telemetry table with RRI index, AVP %, age, and delay status.
+    - Historical collection jobs modal drawer.
+  - **Test Suite**:
+    - **58 backend tests passing** (100% pass rate across all unit and integration suites).
+    - **25 frontend tests passing** (100% pass rate across 10 test suites).
+    - Frontend production build (`tsc -b && vite build`) passing cleanly with zero errors.

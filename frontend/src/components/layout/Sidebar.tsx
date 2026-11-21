@@ -40,7 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'selection', label: 'Selection', icon: Sparkles, badge: 'M04' },
   { id: 'production', label: 'Production', icon: Scissors, badge: 'M05' },
   { id: 'distribution', label: 'Distribution', icon: Share2, badge: 'M06' },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3, badge: 'M08' },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 

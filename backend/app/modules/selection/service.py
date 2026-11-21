@@ -197,6 +197,7 @@ class SelectionService:
         cls,
         scene: VideoScene,
         weights: Optional[RankingWeights] = None,
+        feedback_multipliers: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, float, float, float, float, str, str]:
         """Evaluate hook, retention, context, audio, overall score, rationale, and title.
         
@@ -213,13 +214,56 @@ class SelectionService:
         audio_score = cls.evaluate_audio_quality(scene)
 
         # 2. Configurable Weighted Overall Score
-        overall_score = round(
+        raw_overall = (
             active_weights.hook_weight * hook_score
             + active_weights.retention_weight * retention_score
             + active_weights.context_weight * context_score
-            + active_weights.audio_weight * audio_score,
-            1,
+            + active_weights.audio_weight * audio_score
         )
+
+        feedback_adjustment_text = ""
+        overall_score = round(raw_overall, 1)
+
+        # Apply closed-loop analytics feedback if enabled and present
+        if feedback_multipliers and feedback_multipliers.get("feedback_enabled"):
+            cat_mults = feedback_multipliers.get("category_multipliers", {})
+            dur_mults = feedback_multipliers.get("duration_multipliers", {})
+            max_impact = feedback_multipliers.get("max_impact", 0.15)
+
+            # Inferred category
+            tags_str = " ".join(scene.tags or []).lower()
+            label_str = scene.scene_label.lower()
+            combined_text = f"{label_str} {tags_str}"
+            if any(w in combined_text for w in ["heist", "bank", "robbery"]):
+                cat = "heist"
+            elif any(w in combined_text for w in ["chase", "police", "cop"]):
+                cat = "chase"
+            elif any(w in combined_text for w in ["stunt", "drift", "jump", "plane"]):
+                cat = "stunt"
+            elif any(w in combined_text for w in ["shootout", "combat", "fight"]):
+                cat = "combat"
+            else:
+                cat = "general"
+
+            if duration < 25.0:
+                dur_bucket = "15-25s"
+            elif duration < 35.0:
+                dur_bucket = "25-35s"
+            elif duration < 45.0:
+                dur_bucket = "35-45s"
+            else:
+                dur_bucket = "45-60s"
+
+            c_mult = cat_mults.get(cat, 1.0)
+            d_mult = dur_mults.get(dur_bucket, 1.0)
+            combined_mult = c_mult * d_mult
+            clamped_mult = max(1.0 - max_impact, min(1.0 + max_impact, combined_mult))
+
+            if abs(clamped_mult - 1.0) >= 0.005:
+                overall_score = round(min(100.0, max(0.0, raw_overall * clamped_mult)), 1)
+                feedback_adjustment_text = (
+                    f" [Analytics Feedback: {clamped_mult:+.2f}x calibrated modifier for {cat}/{dur_bucket}]"
+                )
 
         # 3. Explainable Rationale
         rationale_parts = []
@@ -241,7 +285,7 @@ class SelectionService:
         if audio_score >= 75.0:
             rationale_parts.append("Rich audio/speech")
 
-        rationale = ". ".join(rationale_parts) + "."
+        rationale = ". ".join(rationale_parts) + "." + feedback_adjustment_text
 
         # 4. Punchy Shorts Title Suggestion
         clean_label = scene.scene_label.replace("GTA 6", "").replace("Gameplay", "").strip()
@@ -267,6 +311,7 @@ class SelectionService:
         min_score_threshold: float = 60.0,
         max_candidates: int = 8,
         weights: Optional[RankingWeights] = None,
+        feedback_multipliers: Optional[Dict[str, Any]] = None,
     ) -> List[CandidateClip]:
         """Generate, score, deduplicate, and persist candidate clips for a source."""
         # Retrieve indexed scenes for this source
@@ -282,10 +327,19 @@ class SelectionService:
 
         active_weights = (weights or RankingWeights()).normalize()
 
+        if feedback_multipliers is None:
+            try:
+                from app.modules.analytics.service import AnalyticsService
+                feedback_multipliers = await AnalyticsService.get_feedback_multipliers(db)
+            except Exception:
+                feedback_multipliers = None
+
         # 1. Score all scenes deterministically
         scored_items: List[Dict[str, Any]] = []
         for scene in scenes:
-            hook, ret, ctx, aud, overall, rationale, title = cls.calculate_scores(scene, active_weights)
+            hook, ret, ctx, aud, overall, rationale, title = cls.calculate_scores(
+                scene, active_weights, feedback_multipliers
+            )
             if overall >= min_score_threshold:
                 tags_set = {t.lower() for t in (scene.tags or [])}
                 tokens = set(scene.scene_label.lower().split()) | tags_set

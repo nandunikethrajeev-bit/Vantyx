@@ -330,4 +330,105 @@ export interface AutomationStatus {
   disk_free_gb: number;
 }
 
+// ---------------- Audience Analytics & Feedback Domain Types ----------------
+
+export interface ChannelAnalyticsOverview {
+  channel_id: string;
+  channel_name: string;
+  snapshot_date: string;
+  total_views: number;
+  total_subscribers: number;
+  subscribers_gained: number;
+  total_videos: number;
+  estimated_minutes_watched: number;
+  average_view_duration_seconds: number;
+  average_view_percentage: number;
+  collection_source: 'api' | 'mock';
+  is_delayed_reporting: boolean;
+  history_trend: Array<{
+    date: string;
+    views: number;
+    subscribers: number;
+    minutes_watched: number;
+  }>;
+}
+
+export interface PublishedVideoPerformance {
+  schedule_id: number;
+  youtube_video_id?: string | null;
+  title: string;
+  slot_name: string;
+  scheduled_time: string;
+  age_days: number;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  subscribers_gained: number;
+  average_view_duration_seconds: number;
+  average_view_percentage: number;
+  relative_retention_index: number;
+  hook_retention_rate: number;
+  category: string;
+  duration_bucket: string;
+  reporting_status: 'complete' | 'partial' | 'delayed' | 'inaccessible' | 'pending';
+  is_delayed_reporting: boolean;
+}
+
+export interface InsightBucket {
+  key: string;
+  label: string;
+  sample_size: number;
+  avg_views: number;
+  avg_retention_pct: number;
+  confidence_level: 'low' | 'medium' | 'high';
+  relative_multiplier: number;
+  rationale: string;
+}
+
+export interface PerformanceIntelligence {
+  top_clips: Array<{
+    candidate_id: number;
+    schedule_id?: number | null;
+    relative_retention_index: number;
+    hook_retention_rate: number;
+    views: number;
+    average_view_percentage: number;
+    category: string;
+    duration_bucket: string;
+    publish_slot: string;
+  }>;
+  hook_insights: InsightBucket[];
+  duration_insights: InsightBucket[];
+  category_insights: InsightBucket[];
+  slot_insights: InsightBucket[];
+  correlation_vs_causation_notice: string;
+  overall_confidence: 'low' | 'medium' | 'high';
+  total_samples_analyzed: number;
+}
+
+export interface AnalyticsCollectionJob {
+  id: number;
+  job_id: string;
+  job_type: 'scheduled' | 'manual' | 'initial_bootstrap';
+  status: 'running' | 'completed' | 'failed';
+  started_at: string;
+  completed_at?: string | null;
+  videos_probed: number;
+  snapshots_created: number;
+  errors_count: number;
+  error_details?: string | null;
+}
+
+export interface FeedbackStatus {
+  feedback_enabled: boolean;
+  max_impact: number;
+  min_sample_size: number;
+  category_multipliers: Record<string, number>;
+  duration_multipliers: Record<string, number>;
+  hook_multipliers: Record<string, number>;
+  active_profiles_count: number;
+}
+
+
 

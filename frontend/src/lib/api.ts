@@ -20,6 +20,11 @@ import {
   VideoSource,
   WorkflowRun,
   YouTubeAccount,
+  ChannelAnalyticsOverview,
+  PublishedVideoPerformance,
+  PerformanceIntelligence,
+  AnalyticsCollectionJob,
+  FeedbackStatus,
 } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -414,5 +419,48 @@ export async function triggerWorkflowRecovery(): Promise<{ recovered_count: numb
     method: 'POST',
   });
 }
+
+// ---------------- Audience Analytics & Performance Feedback API ----------------
+
+export async function fetchAnalyticsOverview(): Promise<ChannelAnalyticsOverview> {
+  return await request<ChannelAnalyticsOverview>('/api/v1/analytics/overview');
+}
+
+export async function fetchPublishedVideosPerformance(): Promise<PublishedVideoPerformance[]> {
+  return await request<PublishedVideoPerformance[]>('/api/v1/analytics/videos');
+}
+
+export async function fetchPerformanceInsights(): Promise<PerformanceIntelligence> {
+  return await request<PerformanceIntelligence>('/api/v1/analytics/insights');
+}
+
+export async function triggerAnalyticsCollection(): Promise<AnalyticsCollectionJob> {
+  return await request<AnalyticsCollectionJob>('/api/v1/analytics/collect', {
+    method: 'POST',
+  });
+}
+
+export async function fetchAnalyticsJobs(limit = 20): Promise<AnalyticsCollectionJob[]> {
+  return await request<AnalyticsCollectionJob[]>(`/api/v1/analytics/jobs?limit=${limit}`);
+}
+
+export async function fetchFeedbackStatus(): Promise<FeedbackStatus> {
+  return await request<FeedbackStatus>('/api/v1/analytics/feedback/status');
+}
+
+export async function updateFeedbackConfig(data: {
+  feedback_enabled?: boolean;
+  max_impact?: number;
+  min_sample_size?: number;
+}): Promise<{ feedback_enabled: boolean; max_impact: number; min_sample_size: number }> {
+  return await request<{ feedback_enabled: boolean; max_impact: number; min_sample_size: number }>(
+    '/api/v1/analytics/feedback/config',
+    {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }
+  );
+}
+
 
 

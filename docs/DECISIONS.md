@@ -51,3 +51,12 @@
   2. Free disk space is verified before render operations using `shutil.disk_usage` (minimum 1.0 GB required).
   3. Master automation kill-switch (`ORCHESTRATION_ENABLED: bool = False`) defaults to disabled, requiring explicit operator enablement.
 - **Consequences**: Prevents CPU spikes, memory exhaustion, and out-of-disk failures during autonomous batches.
+
+## ADR-010: Audience Performance Intelligence & Calibrated Closed-Loop Feedback Engine
+- **Context**: Autonomous moment selection initially relies on heuristic or multimodal AI scores (hook velocity, action density, audio quality). Without empirical audience retention data, scoring algorithms cannot learn from real-world viewer behavior. However, unconstrained automated feedback risks amplifying noisy or small-sample statistical artifacts (e.g., declaring a random 3 AM publishing slot or single outlier clip superior).
+- **Decision**: Implemented a multi-tier analytics and feedback architecture:
+  1. **Historical Snapshot Persistence**: `VideoAnalyticsSnapshot` and `ChannelAnalyticsSnapshot` store time-series metrics with date-based deduplication and explicit tracking of YouTube's 24-48h reporting lag (`is_delayed_reporting=True`).
+  2. **Correlation vs Causation Guardrails**: Insights explicitly compute sample size $N$ and confidence levels (`low` for $N < 3$, `medium` for $3 \le N < 10$, `high` for $N \ge 10$), warning that time-of-day variations reflect platform distribution surfaces rather than inherent content quality.
+  3. **Strict Bounded Feedback Multipliers**: Feedback multipliers for content categories, duration buckets, and hook velocity are strictly clamped to $[1.0 - \text{max\_impact}, 1.0 + \text{max\_impact}]$ (default $\pm 15\%$) and require $N \ge 3$ samples.
+  4. **Fail-Safe & Explainable**: The feedback engine defaults to disabled (`ANALYTICS_FEEDBACK_ENABLED=False`) and every adjusted score is transparently recorded in `CandidateClip.rationale`.
+- **Consequences**: Enables data-driven optimization without risking model drift, runaway biases, or small-sample distortions.

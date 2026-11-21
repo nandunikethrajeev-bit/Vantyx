@@ -19,7 +19,14 @@ from app.db.models.orchestration import (
     JobExecutionLog,
     DailyPublishingPlan,
 )
-from app.db.models.analytics import VideoMetric
+from app.db.models.analytics import (
+    ChannelAnalyticsSnapshot,
+    VideoAnalyticsSnapshot,
+    PerformanceMetrics,
+    AnalyticsCollectionJob,
+    ClipPerformanceProfile,
+    VideoMetric,
+)
 
 __all__ = [
     "Base",
@@ -39,5 +46,10 @@ __all__ = [
     "JobAttempt",
     "JobExecutionLog",
     "DailyPublishingPlan",
+    "ChannelAnalyticsSnapshot",
+    "VideoAnalyticsSnapshot",
+    "PerformanceMetrics",
+    "AnalyticsCollectionJob",
+    "ClipPerformanceProfile",
     "VideoMetric",
 ]

@@ -102,16 +102,12 @@ class OrchestrationService:
 
         # Duplicate run prevention: check if an active run already exists for this date
         if not force:
-            existing_stmt = (
-                select(WorkflowRun)
-                .where(
-                    WorkflowRun.target_date == target_date,
-                    WorkflowRun.status.in_(["pending", "queued", "running"]),
-                )
-                .order_by(WorkflowRun.id.desc())
+            existing_stmt = select(WorkflowRun).where(
+                WorkflowRun.target_date == target_date,
+                WorkflowRun.status.in_(["pending", "queued", "running"]),
             )
             existing_res = await db.execute(existing_stmt)
-            active_run = existing_res.scalars().first()
+            active_run = existing_res.scalar_one_or_none()
             if active_run:
                 logger.warning(
                     f"Active workflow run #{active_run.id} ({active_run.run_id}) already exists for {target_date}"
