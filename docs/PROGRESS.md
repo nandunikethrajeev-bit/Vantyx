@@ -37,8 +37,30 @@
 
 ---
 
-## Upcoming Milestones
-- **Milestone 03**: AI Intelligence Engine (Multimodal scene segmentation, speech transcription, event detection).
+## Milestone 03: AI Intelligence Engine
+- **Status**: COMPLETE & VERIFIED
+- **Key Deliverables**:
+  - **Pluggable AI Provider Abstraction**:
+    - `AIProviderInterface` decoupling model infrastructure from application logic.
+    - `GeminiAIProvider` for Google Gemini API multimodal understanding.
+    - `HeuristicAIProvider` fallback engine: metadata-driven pacing curves, GTA 6 action/comedy categorization, narrative boundary detection, and excitement scoring.
+  - **Persistent Intelligence Models**:
+    - `AnalysisJob` tracking source ID, status, provider, error states, and execution metadata.
+    - `VideoScene` storing start/end timestamps, duration, scene labels, speech transcripts, excitement scores (0.0-1.0), action intensity, and semantic tags.
+  - **Intelligent Gating & Caching**:
+    - Automatically validates legal eligibility via `DiscoveryService.check_source_eligibility` before executing analysis (blocks unverified content with HTTP 403).
+    - Caches completed analysis jobs to prevent redundant token consumption and re-processing.
+  - **REST Endpoints**:
+    - `POST /api/v1/intelligence/analyze/{source_id}` (Triggers AI analysis).
+    - `GET /api/v1/intelligence/jobs` (Lists analysis jobs with scene counts).
+    - `GET /api/v1/intelligence/jobs/{job_id}` (Retrieves specific job with all scene breakdowns).
+    - `GET /api/v1/intelligence/sources/{source_id}/scenes` (Lists all indexed scenes for a source).
+  - **Interactive Frontend Workspace**:
+    - `IntelligenceView` featuring split workspace: Eligible video source selector on left, live scene breakdown timeline on right.
+    - Real-time excitement and action intensity meters, transcript display, and semantic hashtag badges.
+  - **Test Suite**:
+    - 22 backend tests passing (unit provider tests, integration analysis workflow and eligibility gate blocking tests).
+    - 12 frontend tests passing.
 - **Milestone 04**: Intelligent Clip Selection (Hook evaluation, retention scoring, ranking).
 - **Milestone 05**: Video Production Engine (FFmpeg 9:16 vertical synthesis, subtitles, audio normalization).
 - **Milestone 06**: Distribution & Automated Publishing (YouTube OAuth, 4-slots daily schedule in Asia/Kolkata).

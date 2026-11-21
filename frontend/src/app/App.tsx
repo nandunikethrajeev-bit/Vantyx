@@ -3,6 +3,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { OverviewView } from '@/features/overview/OverviewView';
 import { DiscoveryView } from '@/features/discovery/DiscoveryView';
+import { IntelligenceView } from '@/features/intelligence/IntelligenceView';
 import { ModulePlaceholderView } from '@/features/placeholders/ModulePlaceholderView';
 import { useSystemHealth } from '@/hooks/useSystemHealth';
 import { NavigationSection } from '@/types';
@@ -54,7 +55,8 @@ export const App: React.FC = () => {
             />
           )}
           {currentSection === 'discovery' && <DiscoveryView />}
-          {currentSection !== 'overview' && currentSection !== 'discovery' && (
+          {currentSection === 'intelligence' && <IntelligenceView />}
+          {currentSection !== 'overview' && currentSection !== 'discovery' && currentSection !== 'intelligence' && (
             <ModulePlaceholderView section={currentSection} />
           )}
         </main>

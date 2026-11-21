@@ -91,3 +91,34 @@ export interface DiscoveryRunResult {
   errors: string[];
   timestamp: string;
 }
+
+// ---------------- Intelligence & Scene Understanding ----------------
+
+export interface VideoScene {
+  id: number;
+  job_id: number;
+  source_id: number;
+  start_time: number;
+  end_time: number;
+  duration_seconds: number;
+  scene_label: string;
+  description?: string | null;
+  speech_transcript?: string | null;
+  action_intensity: number;
+  excitement_score: number;
+  tags?: string[] | null;
+  created_at: string;
+}
+
+export interface AnalysisJob {
+  id: number;
+  source_id: number;
+  video_title?: string | null;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  provider: string;
+  error_message?: string | null;
+  scene_count: number;
+  scenes: VideoScene[];
+  created_at: string;
+  updated_at: string;
+}

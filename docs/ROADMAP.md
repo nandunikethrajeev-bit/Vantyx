@@ -42,13 +42,15 @@ M04: Clip Selection
 
 ---
 
-## Milestone 03: Multimodal Media Intelligence
+## Milestone 03: Multimodal Media Intelligence (Complete)
 **Objective**: Deep AI understanding of ingested gameplay videos.
-- [ ] Visual scene boundary detection and shot transitions
-- [ ] High-accuracy transcript extraction and timestamp alignment
-- [ ] Audio dynamic range analysis (speech vs gameplay sound vs music)
-- [ ] Gameplay event classification (high-speed pursuits, missions, cinematic setpieces)
-- [ ] Narrative arc identification and contextual moment tagging
+- [x] Visual scene boundary detection and shot transitions
+- [x] High-accuracy transcript extraction and timestamp alignment
+- [x] Audio dynamic range analysis (speech vs gameplay sound vs excitement)
+- [x] Gameplay event classification (high-speed pursuits, missions, funny glitches)
+- [x] Pluggable provider architecture (Gemini + zero-cost Heuristic engine)
+- [x] Legal rights gating and idempotent analysis caching
+- [x] Interactive Intelligence workspace with scene cards, intensity meters, and tags
 
 ---
 
