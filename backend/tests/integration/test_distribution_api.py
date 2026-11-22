@@ -129,8 +129,9 @@ def test_scheduling_and_publishing_workflow(sync_client: TestClient, tmp_path):
         conn.execute(text(f"UPDATE render_jobs SET is_synthetic = 0 WHERE id = {job_id}"))
 
     # 4. Schedule for future slot
-    unique_day = (int(uid, 16) % 25) + 1
-    target_date = f"2027-01-{unique_day:02d}"
+    unique_day = (int(uid[:2], 16) % 25) + 1
+    unique_month = (int(uid[2:4], 16) % 11) + 2
+    target_date = f"2027-{unique_month:02d}-{unique_day:02d}"
     sched_resp = sync_client.post(
         "/api/v1/distribution/schedule",
         json={

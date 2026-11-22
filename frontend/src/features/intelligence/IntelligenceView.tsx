@@ -236,8 +236,16 @@ export const IntelligenceView: React.FC = () => {
 
                 {activeJob && (
                   <div className="text-right font-mono">
-                    <span className="inline-block border border-vantyx-accent/40 bg-vantyx-accent/10 text-vantyx-accent text-[11px] px-2.5 py-0.5 rounded uppercase">
-                      Engine: {activeJob.provider}
+                    <span className={`inline-block border text-[11px] px-2.5 py-0.5 rounded uppercase ${
+                      activeJob.provider === 'gemini'
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                        : 'border-vantyx-accent/40 bg-vantyx-accent/10 text-vantyx-accent'
+                    }`}>
+                      {activeJob.provider === 'gemini'
+                        ? 'Engine: Gemini 2.5 Flash'
+                        : activeJob.provider === 'heuristic_fallback'
+                        ? 'Engine: Heuristic (Fallback)'
+                        : 'Engine: Heuristic Rule Engine'}
                     </span>
                     <span className="block text-[10px] text-vantyx-textMuted mt-1">
                       {activeJob.scenes.length} Scenes Identified
@@ -269,6 +277,21 @@ export const IntelligenceView: React.FC = () => {
               ) : (
                 /* Scene Cards Timeline */
                 <div className="space-y-3">
+                  {/* Provider Transparency Disclosure */}
+                  {activeJob.provider !== 'gemini' && (
+                    <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-mono text-amber-300 flex items-start gap-2.5">
+                      <Sparkles size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-semibold text-amber-200 uppercase text-[11px]">
+                          Heuristic Metadata Segmentation Active (Visual Frame AI Disabled)
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-amber-300/80 leading-relaxed">
+                          Scene boundaries, pacing metrics, and GTA narrative tags are estimated from video metadata, keyword analysis, and duration pacing rules. Real visual frame-level understanding requires configuring <code className="text-white bg-black/40 px-1 py-0.5 rounded">GEMINI_API_KEY</code>.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between text-xs font-mono text-vantyx-textMuted">
                     <span>SEGMENTED SCENE BREAKDOWN</span>
                     <span>ACTION & EXCITEMENT METRICS</span>
@@ -324,6 +347,29 @@ export const IntelligenceView: React.FC = () => {
                           {scene.speech_transcript && (
                             <div className="rounded border border-vantyx-borderSubtle bg-vantyx-surface/50 p-2.5 text-xs text-vantyx-textSecondary font-mono italic">
                               "{scene.speech_transcript}"
+                            </div>
+                          )}
+
+                          {/* Measured Physical Audio Metrics */}
+                          {scene.audio_metrics && (
+                            <div className="flex flex-wrap items-center gap-3 rounded border border-vantyx-borderSubtle bg-vantyx-surface/30 px-2.5 py-1.5 text-[11px] font-mono text-vantyx-textSecondary">
+                              <span className="text-vantyx-accent uppercase text-[10px] font-semibold tracking-wider">
+                                Measured Audio:
+                              </span>
+                              {scene.audio_metrics.rms_db !== null && scene.audio_metrics.rms_db !== undefined && (
+                                <span>RMS: {scene.audio_metrics.rms_db} dB</span>
+                              )}
+                              {scene.audio_metrics.peak_db !== null && scene.audio_metrics.peak_db !== undefined && (
+                                <span>Peak: {scene.audio_metrics.peak_db} dB</span>
+                              )}
+                              {scene.audio_metrics.loudness_range_lu !== null && scene.audio_metrics.loudness_range_lu !== undefined && (
+                                <span>LRA: {scene.audio_metrics.loudness_range_lu} LU</span>
+                              )}
+                              {scene.audio_metrics.audio_score !== null && scene.audio_metrics.audio_score !== undefined && (
+                                <span className="text-emerald-400 font-medium">
+                                  Track Score: {scene.audio_metrics.audio_score}/100
+                                </span>
+                              )}
                             </div>
                           )}
 

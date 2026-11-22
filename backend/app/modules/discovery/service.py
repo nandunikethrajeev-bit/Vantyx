@@ -4,9 +4,10 @@ Manages GTA creator registry, autonomous source video discovery via official API
 and public RSS/Atom feeds, commercial-use permissions, and pipeline eligibility gating.
 """
 
+import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import httpx
 from sqlalchemy import select
@@ -16,9 +17,16 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.logging import logger
 from app.db.models.creator import Creator
+from app.db.models.intake import IntakeBatch, IntakeBatchItem
 from app.db.models.rights import RightsRecord
 from app.db.models.source import VideoSource
+from app.modules.discovery.url_parser import (
+    canonicalize_youtube_url,
+    parse_youtube_url,
+    validate_and_normalize_youtube_url,
+)
 from app.schemas.discovery import (
+    BatchIntakeRequest,
     CreatorCreate,
     CreatorUpdate,
     RightsRecordUpdate,
@@ -362,6 +370,7 @@ class DiscoveryService:
         if existing:
             raise ValueError(f"Video ID '{data.video_id}' is already registered in VANTYX catalog.")
 
+        is_synthetic = bool(data.is_synthetic) or (data.discovery_method == "synthetic_test")
         source = VideoSource(
             creator_id=data.creator_id,
             video_id=data.video_id,
@@ -372,20 +381,36 @@ class DiscoveryService:
             thumbnail_url=data.thumbnail_url or f"https://i.ytimg.com/vi/{data.video_id}/hqdefault.jpg",
             source_url=data.source_url,
             discovery_method=data.discovery_method,
+            local_video_path=data.local_video_path,
+            is_synthetic=is_synthetic,
         )
         db.add(source)
         await db.flush()
 
         # Rights record
-        permission_status = "own_gameplay" if data.is_own_gameplay else "authorized"
+        if is_synthetic:
+            permission_status = "synthetic_test"
+            commercial_use_allowed = False
+            allowed_editing_scope = "restricted"
+            attribution_required = True
+            attribution_text = "SYNTHETIC_TEST_ONLY — NOT REAL GAMEPLAY"
+            license_documentation = "SYNTHETIC TEST MEDIA — NO COMMERCIAL RIGHTS"
+        else:
+            permission_status = "own_gameplay" if data.is_own_gameplay else "authorized"
+            commercial_use_allowed = True
+            allowed_editing_scope = "full" if data.is_own_gameplay else "transformative_shorts"
+            attribution_required = not data.is_own_gameplay
+            attribution_text = data.attribution_text or ("Own Original Gameplay" if data.is_own_gameplay else None)
+            license_documentation = "Direct Manual Import Verification"
+
         rights = RightsRecord(
             source_id=source.id,
             permission_status=permission_status,
-            commercial_use_allowed=True,
-            allowed_editing_scope="full" if data.is_own_gameplay else "transformative_shorts",
-            attribution_required=not data.is_own_gameplay,
-            attribution_text=data.attribution_text or ("Own Original Gameplay" if data.is_own_gameplay else None),
-            license_documentation="Direct Manual Import Verification",
+            commercial_use_allowed=commercial_use_allowed,
+            allowed_editing_scope=allowed_editing_scope,
+            attribution_required=attribution_required,
+            attribution_text=attribution_text,
+            license_documentation=license_documentation,
             verified_by="Operator",
             verified_at=datetime.now(timezone.utc),
         )
@@ -422,6 +447,10 @@ class DiscoveryService:
     @staticmethod
     def evaluate_eligibility(source: VideoSource) -> Tuple[bool, str]:
         """Pure synchronous validation of source eligibility according to commercial guidelines."""
+        # 0. Synthetic media check
+        if source.is_synthetic or source.discovery_method in ("synthetic_test", "synthetic"):
+            return False, "Synthetic test media: strictly ineligible for commercial pipeline or YouTube publication"
+
         if not source.rights:
             return False, "No rights management record found for this source"
 
@@ -456,3 +485,243 @@ class DiscoveryService:
             raise ValueError(f"Video source ID {source_id} not found")
         is_eligible, reason = DiscoveryService.evaluate_eligibility(source)
         return is_eligible, reason, source
+
+    # ---------------- Batch Intake & Normalization ----------------
+
+    @classmethod
+    async def ingest_batch(
+        cls, db: AsyncSession, data: BatchIntakeRequest
+    ) -> IntakeBatch:
+        """Ingest, validate, normalize, and register a batch of 1 to 20 YouTube URLs.
+        
+        Strictly enforces reuse rights safeguards:
+        - Validates 1 to 20 URLs independently.
+        - Canonicalizes all valid formats to standard watch URLs.
+        - Identifies duplicates within the batch and links existing catalog records.
+        - Verifies creator authorization against database records; unverified claims remain pending_verification.
+        - Atomic and resilient: partial batches succeed without dropping valid entries.
+        """
+        urls = data.urls or []
+        if len(urls) < 1 or len(urls) > 20:
+            raise ValueError(f"Batch must contain between 1 and 20 URLs. Received {len(urls)}.")
+
+        # 1. Corroborate Creator reference against database records
+        creator: Optional[Creator] = None
+        creator_authorization_valid = False
+        creator_tier = "unverified"
+
+        if data.creator_id is not None:
+            creator = await db.get(Creator, data.creator_id)
+            if creator and creator.approval_status == "approved":
+                creator_tier = creator.permission_tier
+                if creator_tier in ("authorized_partner", "own_content", "public_creative_commons"):
+                    creator_authorization_valid = True
+
+        # 2. Initialize IntakeBatch record
+        batch_uid = uuid.uuid4().hex[:6]
+        timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        batch_id = f"batch_{timestamp_str}_{batch_uid}"
+
+        batch = IntakeBatch(
+            batch_id=batch_id,
+            creator_id=creator.id if creator else None,
+            total_submitted=len(urls),
+            total_valid=0,
+            total_duplicates=0,
+            total_rejected=0,
+            status="validating",
+            notes=data.notes,
+        )
+        db.add(batch)
+        await db.flush()
+
+        seen_video_ids_in_batch: Set[str] = set()
+        total_valid = 0
+        total_duplicates = 0
+        total_rejected = 0
+
+        # 3. Process each URL independently
+        for raw_url in urls:
+            cleaned_raw = (raw_url or "").strip()
+            is_valid, video_id, canonical_url, err_msg = validate_and_normalize_youtube_url(cleaned_raw)
+
+            if not is_valid or not video_id or not canonical_url:
+                # Malformed, unsupported host, or invalid 11-char ID
+                item = IntakeBatchItem(
+                    batch_id=batch.id,
+                    source_id=None,
+                    raw_url=cleaned_raw,
+                    canonical_url=None,
+                    video_id=None,
+                    status="rejected",
+                    error_message=err_msg or "Invalid YouTube URL syntax or unsupported domain",
+                )
+                db.add(item)
+                total_rejected += 1
+                continue
+
+            # Check duplicate within this submitted batch
+            if video_id in seen_video_ids_in_batch:
+                item = IntakeBatchItem(
+                    batch_id=batch.id,
+                    source_id=None,
+                    raw_url=cleaned_raw,
+                    canonical_url=canonical_url,
+                    video_id=video_id,
+                    status="duplicate",
+                    error_message=f"Duplicate video ID '{video_id}' within submitted batch",
+                )
+                db.add(item)
+                total_duplicates += 1
+                continue
+
+            seen_video_ids_in_batch.add(video_id)
+
+            # Check if video_id already exists in the video_sources catalog
+            stmt = (
+                select(VideoSource)
+                .where(VideoSource.video_id == video_id)
+                .options(selectinload(VideoSource.rights))
+            )
+            existing_source = (await db.execute(stmt)).scalars().first()
+
+            if existing_source:
+                # Link existing source record
+                item = IntakeBatchItem(
+                    batch_id=batch.id,
+                    source_id=existing_source.id,
+                    raw_url=cleaned_raw,
+                    canonical_url=canonical_url,
+                    video_id=video_id,
+                    status="duplicate",
+                    error_message=f"Video ID '{video_id}' is already registered in VANTYX catalog (Source #{existing_source.id})",
+                )
+                db.add(item)
+                total_duplicates += 1
+                continue
+
+            # 4. Rights and Authorization Determination (Mandatory Verification)
+            if creator_authorization_valid and creator:
+                if creator_tier == "own_content" and data.is_own_gameplay:
+                    permission_status = "own_gameplay"
+                    commercial_use_allowed = True
+                    allowed_editing_scope = "full"
+                    attribution_required = False
+                    attribution_text = "Own Original Gameplay"
+                    item_status = "eligible"
+                    license_doc = f"Corroborated by Creator #{creator.id} ({creator.name}) - Own Content Tier"
+                else:
+                    permission_status = "authorized"
+                    commercial_use_allowed = True
+                    allowed_editing_scope = "transformative_shorts"
+                    attribution_required = True
+                    attribution_text = f"Footage authorized by {creator.name}"
+                    item_status = "eligible"
+                    license_doc = f"Corroborated by Approved Creator #{creator.id} ({creator.name}) - {creator_tier}"
+            else:
+                # Unverified / Caller claim without approved creator confirmation
+                permission_status = "pending"
+                commercial_use_allowed = False
+                allowed_editing_scope = "restricted"
+                attribution_required = True
+                attribution_text = None
+                item_status = "pending_verification"
+                if data.creator_id is not None and not creator:
+                    license_doc = f"Referenced Creator ID #{data.creator_id} not found in approved registry. Pending verification."
+                elif creator and creator.approval_status != "approved":
+                    license_doc = f"Creator #{creator.id} ({creator.name}) approval status is '{creator.approval_status}'. Pending verification."
+                else:
+                    license_doc = "Batch intake: Awaiting verified creator linkage and commercial license proof."
+
+            # 5. Create VideoSource record
+            source = VideoSource(
+                creator_id=creator.id if creator else None,
+                video_id=video_id,
+                title=f"YouTube Source {video_id}",
+                description=f"Batch-ingested source from {canonical_url}",
+                duration_seconds=0,
+                published_at=datetime.now(timezone.utc),
+                thumbnail_url=f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+                source_url=canonical_url,
+                discovery_method="batch_intake",
+                local_video_path=None,
+                is_synthetic=False,
+            )
+            db.add(source)
+            await db.flush()
+
+            # 6. Create RightsRecord
+            rights = RightsRecord(
+                source_id=source.id,
+                permission_status=permission_status,
+                commercial_use_allowed=commercial_use_allowed,
+                allowed_editing_scope=allowed_editing_scope,
+                attribution_required=attribution_required,
+                attribution_text=attribution_text,
+                license_documentation=license_doc,
+                verified_by="Batch Intake Processor" if creator_authorization_valid else None,
+                verified_at=datetime.now(timezone.utc) if creator_authorization_valid else None,
+            )
+            db.add(rights)
+            await db.flush()
+
+            # 7. Create IntakeBatchItem
+            item = IntakeBatchItem(
+                batch_id=batch.id,
+                source_id=source.id,
+                raw_url=cleaned_raw,
+                canonical_url=canonical_url,
+                video_id=video_id,
+                status=item_status,
+                error_message=None,
+            )
+            db.add(item)
+            total_valid += 1
+
+        # 8. Finalize Batch Status
+        batch.total_valid = total_valid
+        batch.total_duplicates = total_duplicates
+        batch.total_rejected = total_rejected
+
+        if total_valid > 0 and total_rejected == 0 and total_duplicates == 0:
+            batch.status = "completed"
+        elif total_valid > 0:
+            batch.status = "partially_completed"
+        else:
+            batch.status = "failed"
+
+        await db.commit()
+        await db.refresh(batch)
+        logger.info(
+            f"Batch {batch.batch_id} processed: {total_valid} valid, "
+            f"{total_duplicates} duplicates, {total_rejected} rejected (status: {batch.status})"
+        )
+        return batch
+
+    @classmethod
+    async def get_batch(cls, db: AsyncSession, batch_id: str) -> Optional[IntakeBatch]:
+        """Retrieve detailed batch record by batch_id including all items, sources, and creator."""
+        stmt = (
+            select(IntakeBatch)
+            .where(IntakeBatch.batch_id == batch_id)
+            .options(
+                selectinload(IntakeBatch.items).selectinload(IntakeBatchItem.source).selectinload(VideoSource.rights),
+                selectinload(IntakeBatch.creator),
+            )
+        )
+        return (await db.execute(stmt)).scalars().first()
+
+    @classmethod
+    async def list_batches(cls, db: AsyncSession, limit: int = 20) -> List[IntakeBatch]:
+        """List recent intake batches in reverse chronological order."""
+        stmt = (
+            select(IntakeBatch)
+            .options(
+                selectinload(IntakeBatch.items).selectinload(IntakeBatchItem.source),
+                selectinload(IntakeBatch.creator),
+            )
+            .order_by(IntakeBatch.id.desc())
+            .limit(limit)
+        )
+        return list((await db.execute(stmt)).scalars().all())
+

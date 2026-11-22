@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import logger
 from app.db.models.intelligence import VideoScene
 from app.db.models.selection import CandidateClip
+from app.modules.intelligence.audio_analyzer import AudioAnalyzer
 from app.schemas.selection import CandidateClipUpdate, RankingWeightsSchema
 
 
@@ -131,8 +132,38 @@ class SelectionService:
     def evaluate_audio_quality(scene: VideoScene) -> float:
         """Evaluate presence, clarity, and richness of the audio track.
         
-        Returns a score in range [25.0, 100.0].
+        Uses genuine physical acoustic measurements if available on scene.audio_metrics:
+        - RMS energy / audibility (-24 dB to -12 dB target)
+        - Peak amplitude headroom (-6.0 dB to -0.5 dB target)
+        - Loudness Range / dynamic variation (LRA >= 5.0 LU)
+        - Prolonged silence penalty (> 20% or > 40%)
+        - Speech / commentary presence
+        
+        Falls back to tag/transcript heuristics if physical audio metrics are absent.
+        Returns a bounded score in range [25.0, 100.0].
         """
+        if scene.audio_metrics and isinstance(scene.audio_metrics, dict):
+            m = scene.audio_metrics
+            has_audio = m.get("has_audio", True)
+            is_silent = m.get("is_silent", False)
+            rms_db = m.get("rms_db")
+            peak_db = m.get("peak_db")
+            lra = m.get("loudness_range_lu")
+            silence_ratio = m.get("silence_ratio", 0.0)
+            is_constant_music = m.get("is_constant_music", False)
+            has_speech = bool(scene.speech_transcript and len(scene.speech_transcript.strip()) > 10)
+
+            return AudioAnalyzer.calculate_scene_audio_score(
+                has_audio=has_audio,
+                rms_db=rms_db,
+                peak_db=peak_db,
+                loudness_range_lu=lra,
+                silence_ratio=silence_ratio,
+                is_constant_music=is_constant_music,
+                is_silent=is_silent,
+                has_speech=has_speech,
+            )
+
         base_score = 55.0  # default adequate game SFX
 
         # Speech transcript presence indicates voice commentary or dialogue
@@ -282,7 +313,17 @@ class SelectionService:
         else:
             rationale_parts.append(f"Duration {duration}s (context: {context_score:.0f})")
 
-        if audio_score >= 75.0:
+        if scene.audio_metrics and isinstance(scene.audio_metrics, dict):
+            m = scene.audio_metrics
+            if m.get("is_silent") or not m.get("has_audio", True):
+                rationale_parts.append(f"Muted/silent audio ({audio_score:.0f}/100)")
+            elif m.get("is_constant_music"):
+                rationale_parts.append(f"Background music track ({audio_score:.0f}/100)")
+            elif audio_score >= 75.0:
+                rationale_parts.append(f"Dynamic audio punch ({audio_score:.0f}/100)")
+            else:
+                rationale_parts.append(f"Measured audio level ({audio_score:.0f}/100)")
+        elif audio_score >= 75.0:
             rationale_parts.append("Rich audio/speech")
 
         rationale = ". ".join(rationale_parts) + "." + feedback_adjustment_text

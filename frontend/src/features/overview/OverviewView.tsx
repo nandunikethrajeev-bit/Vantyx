@@ -1,5 +1,5 @@
 import React from 'react';
-import { Server, Database, ShieldCheck, Terminal, Layers, Cpu, Cloud, HardDrive } from 'lucide-react';
+import { Server, Database, ShieldCheck, Layers, Cpu, Cloud, HardDrive } from 'lucide-react';
 import { ConnectionState, HealthResponse, ReadinessResponse } from '@/types';
 
 interface OverviewViewProps {
@@ -58,10 +58,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
 
           <div className="rounded border border-vantyx-border bg-vantyx-surface/50 p-2.5">
-            <div className="text-[10px] text-vantyx-textMuted uppercase">Background Workers</div>
+            <div className="text-[10px] text-vantyx-textMuted uppercase">Task Execution</div>
             <div className="mt-1 flex items-center gap-1.5 font-medium text-vantyx-textPrimary">
-              <span className={`h-1.5 w-1.5 rounded-full ${workerHealth?.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              {workerHealth?.status === 'healthy' ? 'Distributed Celery' : 'In-Process Eager'}
+              <span className={`h-1.5 w-1.5 rounded-full ${readiness?.execution_mode === 'LOCAL IN-PROCESS' ? 'bg-amber-400' : workerHealth?.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              {readiness?.execution_mode || (workerHealth?.status === 'healthy' ? 'DISTRIBUTED CELERY' : 'LOCAL IN-PROCESS')}
             </div>
           </div>
 
@@ -114,6 +114,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <div className="flex justify-between">
                     <span className="text-vantyx-textMuted">Environment:</span>
                     <span className="uppercase text-vantyx-accent">{liveness.environment}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-vantyx-textMuted">Execution Mode:</span>
+                    <span className="text-vantyx-accent">{liveness.execution_mode || readiness?.execution_mode || 'LOCAL IN-PROCESS'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-vantyx-textMuted">Probe Sync:</span>
@@ -182,35 +186,57 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <span className="flex items-center gap-2 text-xs font-medium text-vantyx-textSecondary">
                   <Cpu size={14} className="text-vantyx-accent" /> Worker & Queue Broker
                 </span>
-                <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${redisHealth?.status === 'healthy'
-                    ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
-                    : 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      redisHealth?.status === 'healthy'
+                        ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                        : 'border-rose-500/30 text-rose-400 bg-rose-500/10'
                     }`}
-                >
-                  {redisHealth?.status === 'healthy' ? 'REDIS ONLINE' : 'EAGER IN-PROCESS'}
-                </span>
+                  >
+                    {redisHealth?.status === 'healthy' ? 'REDIS ONLINE' : 'REDIS OFFLINE'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      readiness?.execution_mode === 'LOCAL IN-PROCESS' || workerHealth?.status === 'eager_development'
+                        ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                        : workerHealth?.status === 'healthy'
+                        ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                        : 'border-rose-500/30 text-rose-400 bg-rose-500/10'
+                    }`}
+                  >
+                    {readiness?.execution_mode === 'LOCAL IN-PROCESS' || workerHealth?.status === 'eager_development'
+                      ? 'LOCAL IN-PROCESS'
+                      : workerHealth?.status === 'healthy'
+                      ? 'DISTRIBUTED'
+                      : 'STANDBY'}
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-1.5 font-mono text-xs text-vantyx-textSecondary">
                 <div className="flex justify-between">
-                  <span className="text-vantyx-textMuted">Broker:</span>
+                  <span className="text-vantyx-textMuted">Execution Mode:</span>
+                  <span className="text-vantyx-accent font-semibold">{readiness?.execution_mode || 'LOCAL IN-PROCESS'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-vantyx-textMuted">Redis Broker:</span>
                   <span className="truncate max-w-[200px]">{redisHealth?.message || 'Probing...'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-vantyx-textMuted">Worker State:</span>
-                  <span className="text-[11px]">{workerHealth?.message || 'Inspecting workers...'}</span>
+                  <span className="text-[11px] truncate max-w-[200px]">{workerHealth?.message || 'Inspecting workers...'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-vantyx-textMuted">Beat Schedule:</span>
-                  <span>06:00 IST (Daily)</span>
+                  <span>{readiness?.execution_mode === 'LOCAL IN-PROCESS' ? 'In-Process (API / Manual Trigger)' : '06:00 IST (Celery Beat Daemon)'}</span>
                 </div>
               </div>
             </div>
 
             <div className="mt-4 pt-3 border-t border-vantyx-borderSubtle text-[11px] text-vantyx-textMuted flex items-center justify-between">
-              <span>Celery 5.4+</span>
-              <span>Concurrency: 2</span>
+              <span>{readiness?.execution_mode === 'LOCAL IN-PROCESS' ? 'In-Process Task Dispatch' : 'Celery 5.4+ (Distributed Pool)'}</span>
+              <span>Concurrency: {readiness?.execution_mode === 'LOCAL IN-PROCESS' ? '1 (In-Process)' : '2'}</span>
             </div>
           </div>
 

@@ -37,5 +37,6 @@ class VideoScene(Base, TimestampMixin):
     action_intensity: Mapped[float] = mapped_column(Float, default=0.5, nullable=False)  # 0.0 - 1.0
     excitement_score: Mapped[float] = mapped_column(Float, default=0.5, nullable=False)  # 0.0 - 1.0
     tags: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    audio_metrics: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     job: Mapped["AnalysisJob"] = relationship("AnalysisJob", back_populates="scenes")

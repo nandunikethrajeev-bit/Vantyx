@@ -7,6 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.modules.discovery.service import DiscoveryService
 from app.schemas.discovery import (
+    BatchIntakeRequest,
+    BatchIntakeResponse,
+    BatchItemResponse,
     CreatorCreate,
     CreatorResponse,
     CreatorUpdate,
@@ -139,6 +142,100 @@ async def run_discovery_cycle(
 
 
 # ---------------- Video Source Endpoints ----------------
+
+def _format_batch_response(batch) -> BatchIntakeResponse:
+    item_responses = []
+    for it in (batch.items or []):
+        is_elig = False
+        perm_status = "none"
+        comm_allowed = False
+        if it.source and it.source.rights:
+            perm_status = it.source.rights.permission_status
+            comm_allowed = it.source.rights.commercial_use_allowed
+            is_elig, _ = DiscoveryService.evaluate_eligibility(it.source)
+        item_responses.append(
+            BatchItemResponse(
+                id=it.id,
+                raw_url=it.raw_url,
+                canonical_url=it.canonical_url,
+                video_id=it.video_id,
+                source_id=it.source_id,
+                status=it.status,
+                is_eligible=is_elig,
+                permission_status=perm_status,
+                commercial_use_allowed=comm_allowed,
+                error_message=it.error_message,
+                created_at=it.created_at,
+            )
+        )
+    return BatchIntakeResponse(
+        batch_id=batch.batch_id,
+        creator_id=batch.creator_id,
+        creator_name=batch.creator.name if batch.creator else None,
+        total_submitted=batch.total_submitted,
+        total_valid=batch.total_valid,
+        total_duplicates=batch.total_duplicates,
+        total_rejected=batch.total_rejected,
+        status=batch.status,
+        items=item_responses,
+        created_at=batch.created_at,
+    )
+
+
+@router.post(
+    "/sources/batch",
+    response_model=BatchIntakeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Batch Ingest and Normalize YouTube URLs",
+)
+async def batch_ingest_sources(
+    data: BatchIntakeRequest,
+    db: AsyncSession = Depends(get_db),
+) -> BatchIntakeResponse:
+    if not data.urls or len(data.urls) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Batch must contain between 1 and 20 URLs. None received.",
+        )
+    if len(data.urls) > 20:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Batch exceeds maximum limit of 20 URLs. Received {len(data.urls)}.",
+        )
+    try:
+        batch = await DiscoveryService.ingest_batch(db, data)
+        full_batch = await DiscoveryService.get_batch(db, batch.batch_id)
+        return _format_batch_response(full_batch or batch)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.get(
+    "/batches/{batch_id}",
+    response_model=BatchIntakeResponse,
+    summary="Get Intake Batch Details & Items",
+)
+async def get_batch_details(
+    batch_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> BatchIntakeResponse:
+    batch = await DiscoveryService.get_batch(db, batch_id)
+    if not batch:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Batch '{batch_id}' not found.")
+    return _format_batch_response(batch)
+
+
+@router.get(
+    "/batches",
+    response_model=List[BatchIntakeResponse],
+    summary="List Recent Intake Batches",
+)
+async def list_intake_batches(
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+) -> List[BatchIntakeResponse]:
+    batches = await DiscoveryService.list_batches(db, limit=limit)
+    return [_format_batch_response(b) for b in batches]
 
 @router.get(
     "/sources",

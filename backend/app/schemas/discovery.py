@@ -96,6 +96,8 @@ class VideoSourceBase(BaseModel):
     thumbnail_url: Optional[str] = None
     source_url: str = Field(..., max_length=1024)
     discovery_method: str = Field(default="manual_import")
+    local_video_path: Optional[str] = None
+    is_synthetic: bool = False
 
 
 class VideoSourceCreate(VideoSourceBase):
@@ -134,3 +136,55 @@ class DiscoveryRunResult(BaseModel):
     duplicates_skipped: int
     errors: List[str]
     timestamp: datetime
+
+
+# ---------------- Batch Intake Schemas ----------------
+
+class BatchIntakeRequest(BaseModel):
+    urls: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=20,
+        description="List of 1 to 20 YouTube URLs to normalize, validate, and intake",
+    )
+    creator_id: Optional[int] = Field(
+        default=None,
+        description="Optional registered creator ID for commercial rights linkage",
+    )
+    is_own_gameplay: bool = Field(
+        default=False,
+        description="Caller claim of own gameplay (verified against creator record)",
+    )
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class BatchItemResponse(BaseModel):
+    id: int
+    raw_url: str
+    canonical_url: Optional[str] = None
+    video_id: Optional[str] = None
+    source_id: Optional[int] = None
+    status: str
+    is_eligible: bool = False
+    permission_status: str = "pending"
+    commercial_use_allowed: bool = False
+    error_message: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BatchIntakeResponse(BaseModel):
+    batch_id: str
+    creator_id: Optional[int] = None
+    creator_name: Optional[str] = None
+    total_submitted: int
+    total_valid: int
+    total_duplicates: int
+    total_rejected: int
+    status: str
+    items: List[BatchItemResponse]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+

@@ -127,7 +127,7 @@ class ProductionService(ProductionServiceInterface):
             # 4. Determine Input Stream Source
             local_file = source.local_video_path
             has_local_file = local_file and os.path.exists(local_file)
-            job.is_synthetic = not has_local_file
+            job.is_synthetic = bool(source.is_synthetic) or (not has_local_file)
 
             filtergraph = cls.build_video_filtergraph(
                 layout_style=config.layout_style,

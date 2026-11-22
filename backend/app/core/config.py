@@ -115,6 +115,10 @@ class Settings(BaseSettings):
     REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL for queue coordination")
     CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0", description="Celery broker URL")
     CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/1", description="Celery result backend URL")
+    TASK_EXECUTION_MODE: str = Field(
+        default="inprocess",
+        description="Background task execution mode: inprocess (local development without Redis) | distributed (Celery + Redis)",
+    )
     CELERY_ALWAYS_EAGER: bool = Field(default=True, description="Execute Celery tasks in-process for test environments and zero-redis fallback")
     ORCHESTRATION_ENABLED: bool = Field(default=False, description="Master automation toggle (requires explicit operator activation)")
     DAILY_PIPELINE_RUN_TIME: str = Field(default="06:00", description="Daily workflow trigger time in Asia/Kolkata timezone")
@@ -163,6 +167,23 @@ class Settings(BaseSettings):
         if env_from_os in ("production", "prod"):
             return True
         return self.APP_ENV.lower() in ("production", "prod") or self.ENVIRONMENT.lower() in ("production", "prod")
+
+    @property
+    def is_local_task_execution(self) -> bool:
+        """Return True if background tasks execute locally in-process without Redis."""
+        return self.TASK_EXECUTION_MODE.lower() in ("inprocess", "local", "eager")
+
+    def verify_production_safeguards(self) -> None:
+        """Verify that production runtime requirements are met.
+        
+        Strictly prevents development-only execution modes in production.
+        """
+        if self.is_production:
+            if self.is_local_task_execution or self.CELERY_ALWAYS_EAGER:
+                raise RuntimeError(
+                    "In-process/eager task execution mode is strictly prohibited in production mode. "
+                    "Distributed execution via Redis and Celery worker is required."
+                )
 
     @property
     def async_database_url(self) -> str:

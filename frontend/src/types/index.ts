@@ -20,11 +20,13 @@ export interface HealthResponse {
   app: string;
   version: string;
   environment: string;
+  execution_mode?: string;
   timestamp: string;
 }
 
 export interface ReadinessResponse {
   status: 'ready' | 'degraded';
+  execution_mode?: string;
   timestamp: string;
   components: {
     database: ComponentHealth;
@@ -109,6 +111,7 @@ export interface VideoScene {
   action_intensity: number;
   excitement_score: number;
   tags?: string[] | null;
+  audio_metrics?: Record<string, any> | null;
   created_at: string;
 }
 

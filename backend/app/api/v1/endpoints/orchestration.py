@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.celery_app import is_redis_available
+from app.core.celery_app import eager_mode, is_redis_available
 from app.core.config import settings
 from app.db.session import get_db
 from app.modules.distribution.service import TimezoneHelper
@@ -41,9 +41,9 @@ async def get_automation_status(db: AsyncSession = Depends(get_db)):
         automation_enabled=settings.ORCHESTRATION_ENABLED,
         daily_run_time_ist=settings.DAILY_PIPELINE_RUN_TIME,
         timezone=settings.TIMEZONE,
-        celery_mode="distributed" if is_redis_available and not settings.CELERY_ALWAYS_EAGER else "eager",
+        celery_mode="eager" if eager_mode else "distributed",
         redis_connected=is_redis_available,
-        active_worker_count=1 if is_redis_available else 0,
+        active_worker_count=1 if (is_redis_available or eager_mode) else 0,
         max_concurrent_renders=settings.MAX_CONCURRENT_RENDERS,
         current_workflow_id=current_wf.run_id if current_wf else None,
         today_plan_status=plan.status,

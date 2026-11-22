@@ -519,6 +519,14 @@ class DistributionService:
             await db.commit()
             raise FileNotFoundError(schedule.error_message)
 
+        candidate = await db.get(CandidateClip, schedule.candidate_id)
+        source = await db.get(VideoSource, candidate.source_id) if candidate else None
+        if render_job.is_synthetic or (source and (source.is_synthetic or not (source.rights and source.rights.commercial_use_allowed))):
+            schedule.status = "failed"
+            schedule.error_message = "Publishing blocked: Media is classified as synthetic test media."
+            await db.commit()
+            raise PublishingEligibilityError(schedule.error_message)
+
         # Create UploadJob tracking record
         file_size = os.path.getsize(render_job.output_file_path)
         upload_job = UploadJob(

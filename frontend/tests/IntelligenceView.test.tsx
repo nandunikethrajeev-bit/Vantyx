@@ -67,4 +67,13 @@ describe('IntelligenceView', () => {
     expect(screen.getByText('#heist')).toBeInTheDocument();
     expect(screen.getByText('95%')).toBeInTheDocument();
   });
+
+  it('displays transparency notice when heuristic provider is active', async () => {
+    render(<IntelligenceView />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Heuristic Metadata Segmentation Active/i)).toBeInTheDocument();
+      expect(screen.getByText(/GEMINI_API_KEY/i)).toBeInTheDocument();
+    });
+  });
 });

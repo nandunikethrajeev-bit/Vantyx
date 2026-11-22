@@ -7,6 +7,7 @@ from app.db.base import Base
 from app.db.models.creator import Creator
 from app.db.models.source import VideoSource
 from app.db.models.rights import RightsRecord
+from app.db.models.intake import IntakeBatch, IntakeBatchItem
 from app.db.models.intelligence import AnalysisJob, VideoScene
 from app.db.models.selection import CandidateClip
 from app.db.models.production import RenderJob
@@ -33,6 +34,8 @@ __all__ = [
     "Creator",
     "VideoSource",
     "RightsRecord",
+    "IntakeBatch",
+    "IntakeBatchItem",
     "AnalysisJob",
     "VideoScene",
     "CandidateClip",

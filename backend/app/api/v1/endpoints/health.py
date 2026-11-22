@@ -28,11 +28,13 @@ router = APIRouter()
 )
 async def liveness_probe() -> HealthResponse:
     """Check basic API liveness."""
+    mode_str = "LOCAL IN-PROCESS" if settings.is_local_task_execution else "DISTRIBUTED CELERY"
     return HealthResponse(
         status="ok",
         app=settings.PROJECT_NAME,
         version="0.1.0",
         environment=settings.ENVIRONMENT,
+        execution_mode=mode_str,
         timestamp=datetime.now(timezone.utc),
     )
 
@@ -58,21 +60,37 @@ async def readiness_probe() -> ReadinessResponse:
 
     # 2. Redis Cache & Queue Broker
     redis_start = time.perf_counter()
+    real_redis_connected = False
+    redis_latency = None
+    redis_err_msg = None
     try:
         r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=0.2, socket_timeout=0.2)
         r.ping()
+        real_redis_connected = True
         redis_latency = round((time.perf_counter() - redis_start) * 1000, 2)
+    except Exception as exc:
+        redis_err_msg = type(exc).__name__
+
+    if real_redis_connected:
         redis_health = ComponentHealth(
             status="healthy",
             message=f"Redis broker online at {settings.REDIS_URL}",
             latency_ms=redis_latency,
         )
-    except Exception as exc:
-        redis_health = ComponentHealth(
-            status="unreachable" if settings.is_production else "degraded",
-            message=f"Redis broker offline ({type(exc).__name__}). Using in-process eager fallback in non-production.",
-            latency_ms=None,
-        )
+    else:
+        # NEVER report Redis as healthy or online unless a real connection succeeds
+        if settings.is_local_task_execution and not settings.is_production:
+            redis_health = ComponentHealth(
+                status="offline",
+                message=f"Redis broker offline ({redis_err_msg or 'Unreachable'}). Not required for local in-process execution.",
+                latency_ms=None,
+            )
+        else:
+            redis_health = ComponentHealth(
+                status="unreachable" if settings.is_production else "degraded",
+                message=f"Redis broker offline ({redis_err_msg or 'Unreachable'}).",
+                latency_ms=None,
+            )
 
     # 3. Celery Worker Pool
     worker_info = check_celery_worker_availability()
@@ -100,9 +118,9 @@ async def readiness_probe() -> ReadinessResponse:
     ai_health = ComponentHealth(
         status="healthy" if ai_configured else "heuristic_fallback",
         message=(
-            "Google Gemini Multimodal API active"
+            "Google Gemini Multimodal API active (gemini-2.5-flash)"
             if ai_configured
-            else "GEMINI_API_KEY unset: Heuristic scene intelligence engine active"
+            else "GEMINI_API_KEY unset: Heuristic rule-based segmentation engine active (visual frame AI disabled)"
         ),
         latency_ms=None,
     )
@@ -127,11 +145,17 @@ async def readiness_probe() -> ReadinessResponse:
         )
 
     # Compute overall readiness
-    critical_healthy = is_db_connected and (not settings.is_production or redis_health.status == "healthy")
+    mode_str = "LOCAL IN-PROCESS" if settings.is_local_task_execution else "DISTRIBUTED CELERY"
+    if settings.is_local_task_execution and not settings.is_production:
+        critical_healthy = is_db_connected and storage_health.status == "healthy"
+    else:
+        critical_healthy = is_db_connected and redis_health.status == "healthy" and worker_health.status == "healthy"
+
     overall_status = "ready" if critical_healthy else "degraded"
 
     return ReadinessResponse(
         status=overall_status,
+        execution_mode=mode_str,
         timestamp=datetime.now(timezone.utc),
         components={
             "database": db_health,

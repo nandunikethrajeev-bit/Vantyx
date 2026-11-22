@@ -15,30 +15,35 @@ from app.core.logging import logger
 
 # Check Redis availability safely with quick timeout probe
 is_redis_available = False
-try:
-    r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=0.2, socket_timeout=0.2)
-    r.ping()
-    is_redis_available = True
-except Exception:
-    is_redis_available = False
+if not settings.is_local_task_execution or settings.is_production:
+    try:
+        r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=0.2, socket_timeout=0.2)
+        r.ping()
+        is_redis_available = True
+    except Exception:
+        is_redis_available = False
 
+# Enforce strict production safeguards against development-only execution modes
 if settings.is_production:
-    if settings.CELERY_ALWAYS_EAGER:
-        raise RuntimeError("Celery eager execution mode is strictly prohibited in production mode.")
+    settings.verify_production_safeguards()
     if not is_redis_available:
         raise RuntimeError(
             f"Redis broker connection required for Celery in production mode. Unreachable at {settings.REDIS_URL}"
         )
 
+# Determine background task execution mode
+eager_mode = (
+    settings.is_local_task_execution
+    or settings.CELERY_ALWAYS_EAGER
+    or not is_redis_available
+) and not settings.is_production
+
 # Initialize Celery Application
 celery_app = Celery(
     "vantyx",
-    broker=settings.CELERY_BROKER_URL if is_redis_available else "memory://",
-    backend=settings.CELERY_RESULT_BACKEND if is_redis_available else "cache+memory://",
+    broker=settings.CELERY_BROKER_URL if (is_redis_available and not eager_mode) else "memory://",
+    backend=settings.CELERY_RESULT_BACKEND if (is_redis_available and not eager_mode) else "cache+memory://",
 )
-
-# Apply configuration
-eager_mode = (settings.CELERY_ALWAYS_EAGER or not is_redis_available) and not settings.is_production
 
 # Parse daily run time (e.g. "06:00")
 run_hour, run_minute = 6, 0
@@ -81,10 +86,10 @@ import app.tasks.analytics      # noqa: F401
 
 def check_celery_worker_availability() -> Dict[str, Any]:
     """Inspect Celery worker connectivity and return structured health details."""
-    if eager_mode:
+    if eager_mode or settings.is_local_task_execution:
         return {
             "status": "eager_development",
-            "message": "Celery running in in-process eager mode (local development/testing)",
+            "message": "Local in-process execution active (Celery tasks execute in-process without distributed workers)",
             "workers": [],
             "worker_count": 0,
         }

@@ -11,12 +11,13 @@ class HealthResponse(BaseModel):
     app: str = Field(default="VANTYX", description="Application name")
     version: str = Field(default="0.1.0", description="Application semantic version")
     environment: str = Field(description="Active runtime environment")
+    execution_mode: str = Field(default="LOCAL IN-PROCESS", description="Task execution mode: LOCAL IN-PROCESS | DISTRIBUTED CELERY")
     timestamp: datetime = Field(description="UTC timestamp of the health check")
 
 
 class ComponentHealth(BaseModel):
     """Component-level health status."""
-    status: str = Field(description="Component status: healthy | degraded | unreachable")
+    status: str = Field(description="Component status: healthy | degraded | unreachable | offline | eager_development")
     message: str = Field(description="Descriptive status message")
     latency_ms: Optional[float] = Field(default=None, description="Probe latency in milliseconds if measured")
 
@@ -24,6 +25,7 @@ class ComponentHealth(BaseModel):
 class ReadinessResponse(BaseModel):
     """Readiness probe response indicating system and dependency availability."""
     status: str = Field(description="Overall readiness: ready | degraded")
+    execution_mode: str = Field(default="LOCAL IN-PROCESS", description="Task execution mode: LOCAL IN-PROCESS | DISTRIBUTED CELERY")
     timestamp: datetime = Field(description="UTC timestamp of the readiness check")
     components: Dict[str, ComponentHealth] = Field(
         description="Health states of subsystem components and external dependencies"

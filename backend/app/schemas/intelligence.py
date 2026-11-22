@@ -18,6 +18,7 @@ class VideoSceneResponse(BaseModel):
     action_intensity: float
     excitement_score: float
     tags: Optional[List[str]] = None
+    audio_metrics: Optional[Dict[str, Any]] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

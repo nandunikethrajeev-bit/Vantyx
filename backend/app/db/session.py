@@ -85,6 +85,17 @@ async def init_db() -> None:
     import app.db.models  # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Resilient schema patch for audio_metrics column
+        try:
+            if "sqlite" in settings.async_database_url:
+                res = await conn.execute(text("PRAGMA table_info(video_scenes)"))
+                cols = [r[1] for r in res.fetchall()]
+                if "audio_metrics" not in cols:
+                    await conn.execute(text("ALTER TABLE video_scenes ADD COLUMN audio_metrics JSON"))
+            else:
+                await conn.execute(text("ALTER TABLE video_scenes ADD COLUMN IF NOT EXISTS audio_metrics JSON"))
+        except Exception as exc:
+            logger.debug(f"audio_metrics column verification note: {exc}")
     logger.info("Database schema verified and active")
 
 
