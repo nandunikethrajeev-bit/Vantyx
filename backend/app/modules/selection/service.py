@@ -209,15 +209,22 @@ class SelectionService:
         start: float,
         end: float,
         chosen_candidates: List[Dict[str, Any]],
+        max_overlap_ratio: float = 0.20,
         tolerance_seconds: float = 3.0,
     ) -> bool:
-        """Check if [start, end] overlaps with any chosen interval beyond tolerance."""
+        """Check if [start, end] overlaps with any chosen interval by >= 20% or beyond tolerance."""
+        candidate_dur = max(0.1, end - start)
         for chosen in chosen_candidates:
             c_start = chosen["start_time"]
             c_end = chosen["end_time"]
+            chosen_dur = max(0.1, c_end - c_start)
             overlap_start = max(start, c_start)
             overlap_end = min(end, c_end)
-            if overlap_end - overlap_start > tolerance_seconds:
+            overlap_seconds = max(0.0, overlap_end - overlap_start)
+            if overlap_seconds > tolerance_seconds:
+                return True
+            overlap_ratio = overlap_seconds / min(candidate_dur, chosen_dur)
+            if overlap_ratio >= max_overlap_ratio:
                 return True
         return False
 

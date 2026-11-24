@@ -42,7 +42,11 @@ class Settings(BaseSettings):
     )
     TOKEN_ENCRYPTION_KEY: str = Field(
         default="",
-        description="Fernet/AES-256 encryption key for OAuth tokens at rest",
+        description="Fernet key (AES-128-CBC + HMAC-SHA256) for OAuth tokens at rest",
+    )
+    TOKEN_ENCRYPTION_KEY_FALLBACKS: str = Field(
+        default="",
+        description="Comma-separated previous Fernet keys for seamless MultiFernet rotation",
     )
 
     # API Routing

@@ -191,11 +191,18 @@ class ProductionService(ProductionServiceInterface):
             ]
             subprocess.run(thumb_cmd, capture_output=True, text=True, timeout=15)
 
-            # 6. Mark Job Completed & Candidate Produced
+            # 6. Validate output file existence and integrity
+            if not output_path.exists() or output_path.stat().st_size < 1024:
+                raise RuntimeError(
+                    f"FFmpeg render produced an invalid or empty file at {output_path} "
+                    f"(size: {output_path.stat().st_size if output_path.exists() else 0} bytes)"
+                )
+
+            # 7. Mark Job Completed & Candidate Produced
             job.status = "completed"
             job.progress_pct = 100.0
             job.output_file_path = str(output_path)
-            if thumb_path.exists():
+            if thumb_path.exists() and thumb_path.stat().st_size > 0:
                 job.thumbnail_path = str(thumb_path)
 
             candidate.status = "produced"
@@ -213,15 +220,51 @@ class ProductionService(ProductionServiceInterface):
             await db.refresh(job)
             return job
 
-    # ---------------- Query Helpers ----------------
+    # ---------------- Query Helpers & Integrity ----------------
 
-    @staticmethod
+    @classmethod
+    async def quarantine_orphaned_jobs(cls, db: AsyncSession) -> int:
+        """Scan completed jobs and mark any with missing or empty media files as failed.
+        
+        Prevents ghost records where previous tests or manual file deletions leave
+        completed jobs in the DB with non-existent files.
+        """
+        stmt = select(RenderJob).where(RenderJob.status == "completed")
+        result = await db.execute(stmt)
+        completed_jobs = list(result.scalars().all())
+        quarantined_count = 0
+
+        for job in completed_jobs:
+            is_corrupt = False
+            if not job.output_file_path:
+                is_corrupt = True
+            else:
+                p = Path(job.output_file_path)
+                if not p.is_absolute():
+                    p = Path(os.getcwd()) / p
+                if not p.exists() or p.stat().st_size < 1024:
+                    is_corrupt = True
+
+            if is_corrupt:
+                job.status = "failed"
+                job.error_message = "Rendered media file is missing on disk or corrupted (quarantined)"
+                db.add(job)
+                quarantined_count += 1
+
+        if quarantined_count > 0:
+            await db.commit()
+            logger.info(f"Quarantined {quarantined_count} orphaned/missing render jobs.")
+        return quarantined_count
+
+    @classmethod
     async def list_jobs(
+        cls,
         db: AsyncSession,
         status: Optional[str] = None,
         limit: int = 50,
     ) -> List[RenderJob]:
-        """List render jobs ordered by creation date descending."""
+        """List render jobs ordered by creation date descending with integrity verification."""
+        await cls.quarantine_orphaned_jobs(db)
         stmt = select(RenderJob).order_by(RenderJob.created_at.desc()).limit(limit)
         if status:
             stmt = stmt.where(RenderJob.status == status)

@@ -96,6 +96,50 @@ async def init_db() -> None:
                 await conn.execute(text("ALTER TABLE video_scenes ADD COLUMN IF NOT EXISTS audio_metrics JSON"))
         except Exception as exc:
             logger.debug(f"audio_metrics column verification note: {exc}")
+
+        # Resilient schema patch for creator OAuth & channel authorization columns
+        creator_cols_sqlite = [
+            ("oauth_status", "VARCHAR(32) DEFAULT 'disconnected'"),
+            ("google_account_id", "VARCHAR(128)"),
+            ("google_account_email", "VARCHAR(255)"),
+            ("verified_channel_id", "VARCHAR(128)"),
+            ("verified_channel_title", "VARCHAR(255)"),
+            ("verified_at", "TIMESTAMP"),
+            ("access_token", "TEXT"),
+            ("refresh_token", "TEXT"),
+            ("token_expires_at", "TIMESTAMP"),
+            ("oauth_scopes", "VARCHAR(512)"),
+            ("is_revoked", "BOOLEAN DEFAULT 0"),
+            ("revoked_at", "TIMESTAMP"),
+            ("revocation_reason", "VARCHAR(512)"),
+        ]
+        creator_cols_pg = [
+            ("oauth_status", "VARCHAR(32) DEFAULT 'disconnected'"),
+            ("google_account_id", "VARCHAR(128)"),
+            ("google_account_email", "VARCHAR(255)"),
+            ("verified_channel_id", "VARCHAR(128)"),
+            ("verified_channel_title", "VARCHAR(255)"),
+            ("verified_at", "TIMESTAMP WITH TIME ZONE"),
+            ("access_token", "TEXT"),
+            ("refresh_token", "TEXT"),
+            ("token_expires_at", "TIMESTAMP WITH TIME ZONE"),
+            ("oauth_scopes", "VARCHAR(512)"),
+            ("is_revoked", "BOOLEAN DEFAULT FALSE"),
+            ("revoked_at", "TIMESTAMP WITH TIME ZONE"),
+            ("revocation_reason", "VARCHAR(512)"),
+        ]
+        try:
+            if "sqlite" in settings.async_database_url:
+                res = await conn.execute(text("PRAGMA table_info(creators)"))
+                existing = [r[1] for r in res.fetchall()]
+                for col_name, col_def in creator_cols_sqlite:
+                    if col_name not in existing:
+                        await conn.execute(text(f"ALTER TABLE creators ADD COLUMN {col_name} {col_def}"))
+            else:
+                for col_name, col_def in creator_cols_pg:
+                    await conn.execute(text(f"ALTER TABLE creators ADD COLUMN IF NOT EXISTS {col_name} {col_def}"))
+        except Exception as exc:
+            logger.debug(f"creator OAuth columns migration note: {exc}")
     logger.info("Database schema verified and active")
 
 

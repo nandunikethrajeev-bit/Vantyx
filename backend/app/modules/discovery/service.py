@@ -383,6 +383,7 @@ class DiscoveryService:
             discovery_method=data.discovery_method,
             local_video_path=data.local_video_path,
             is_synthetic=is_synthetic,
+            raw_metadata=data.raw_metadata,
         )
         db.add(source)
         await db.flush()

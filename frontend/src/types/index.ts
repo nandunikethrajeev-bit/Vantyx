@@ -1,5 +1,7 @@
 export type NavigationSection =
+  | 'url_workspace'
   | 'overview'
+  | 'outputs'
   | 'discovery'
   | 'intelligence'
   | 'selection'
@@ -49,8 +51,84 @@ export interface Creator {
   approval_status: 'pending' | 'approved' | 'rejected';
   permission_tier: 'own_content' | 'authorized_partner' | 'public_creative_commons' | 'unverified';
   notes?: string | null;
+  oauth_status?: 'disconnected' | 'pending' | 'connected' | 'expired' | 'revoked';
+  google_account_email?: string | null;
+  verified_channel_id?: string | null;
+  verified_channel_title?: string | null;
+  verified_at?: string | null;
+  is_revoked?: boolean;
+  revoked_at?: string | null;
+  token_expires_at?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CreatorOAuthInitiateResponse {
+  configured: boolean;
+  authorization_url?: string | null;
+  state?: string | null;
+  message: string;
+  mock_available?: boolean;
+}
+
+export interface CreatorOAuthStatusResponse {
+  creator_id: number;
+  creator_name: string;
+  channel_id: string;
+  oauth_status: 'disconnected' | 'pending' | 'connected' | 'expired' | 'revoked';
+  google_account_email?: string | null;
+  verified_channel_id?: string | null;
+  verified_channel_title?: string | null;
+  is_ownership_verified: boolean;
+  is_revoked: boolean;
+  token_expires_at?: string | null;
+  is_token_expired: boolean;
+  verified_at?: string | null;
+  revoked_at?: string | null;
+  message: string;
+}
+
+export interface CreatorAuditLogResponse {
+  id: number;
+  creator_id: number;
+  event_type: string;
+  channel_id?: string | null;
+  details?: string | null;
+  created_at: string;
+}
+
+export interface CreatorAssetAssociationResponse {
+  id: number;
+  creator_id: number;
+  video_id: string;
+  asset_filename: string;
+  asset_path: string;
+  file_size_bytes: number;
+  duration_seconds: number;
+  is_verified: boolean;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatorVaultFile {
+  filename: string;
+  relative_path: string;
+  file_size_bytes: number;
+  duration_seconds: number;
+  is_valid: boolean;
+  integrity_message: string;
+  associated_video_id?: string | null;
+  is_associated: boolean;
+}
+
+export interface CreatorVaultStatusResponse {
+  creator_id: number;
+  vault_directory: string;
+  total_files: number;
+  total_size_bytes: number;
+  files: CreatorVaultFile[];
+  associations: CreatorAssetAssociationResponse[];
 }
 
 export interface RightsRecord {
@@ -82,10 +160,93 @@ export interface VideoSource {
   source_url: string;
   discovery_method: string;
   local_video_path?: string | null;
+  is_synthetic?: boolean;
+  media_status?: 'ready' | 'awaiting_media' | 'missing';
   rights?: RightsRecord | null;
   is_eligible: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface BatchItemResponse {
+  id: number;
+  raw_url: string;
+  canonical_url: string;
+  video_id: string;
+  status:
+    | 'pending'
+    | 'imported'
+    | 'duplicate'
+    | 'rejected'
+    | 'invalid_url'
+    | 'url_submitted'
+    | 'url_validated'
+    | 'metadata_ready'
+    | 'metadata_resolved'
+    | 'rights_pending'
+    | 'rights_rejected'
+    | 'rights_verified'
+    | 'media_resolving'
+    | 'media_ready'
+    | 'awaiting_media'
+    | 'awaiting_authorized_media'
+    | 'analyzing'
+    | 'candidates_ready'
+    | 'rendering'
+    | 'output_validated'
+    | 'completed'
+    | 'failed'
+    | string;
+  error_message?: string | null;
+  source_id?: number | null;
+  source_title?: string | null;
+  creator_name?: string | null;
+  source_category?: 'creator_owned' | 'authorized_partner' | 'licensed_third_party' | 'unresolved' | string;
+  source_provider?: string | null;
+  media_status?: string;
+  permission_status?: string;
+  commercial_use_allowed?: boolean;
+  is_eligible?: boolean;
+  created_at: string;
+}
+
+export interface UnifiedOutputItem {
+  job_id: number;
+  candidate_id: number;
+  source_id: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | string;
+  progress_pct: number;
+  resolution: string;
+  layout_style: string;
+  format_aspect: string;
+  has_burned_subtitles: boolean;
+  is_synthetic: boolean;
+  created_at: string;
+  output_file_path?: string | null;
+  file_exists: boolean;
+  file_size_mb: number;
+  source_title: string;
+  source_url: string;
+  video_id: string;
+  clip_title: string;
+  duration_seconds: number;
+  overall_score: number;
+  hook_score: number;
+  retention_score: number;
+  context_score: number;
+  audio_score: number;
+  approval_status: string;
+  error_message?: string | null;
+}
+
+export interface BatchIntakeResponse {
+  batch_id: string;
+  total_submitted: number;
+  total_valid: number;
+  total_duplicates: number;
+  total_invalid: number;
+  items: BatchItemResponse[];
+  created_at: string;
 }
 
 export interface DiscoveryRunResult {

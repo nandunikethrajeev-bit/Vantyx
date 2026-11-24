@@ -4,7 +4,12 @@ All domain models are registered and exported here.
 """
 
 from app.db.base import Base
-from app.db.models.creator import Creator
+from app.db.models.creator import (
+    Creator,
+    CreatorOAuthState,
+    CreatorAuditLog,
+    CreatorAssetAssociation,
+)
 from app.db.models.source import VideoSource
 from app.db.models.rights import RightsRecord
 from app.db.models.intake import IntakeBatch, IntakeBatchItem

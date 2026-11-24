@@ -9,12 +9,15 @@ import {
   Layers,
   X,
   Volume2,
+  Download,
+  VideoOff,
 } from 'lucide-react';
 import {
   fetchRenderJobs,
   fetchCandidates,
   triggerRender,
   getRenderStreamUrl,
+  getRenderDownloadUrl,
 } from '@/lib/api';
 import { CandidateClip, RenderJob, RenderSettingsInput } from '@/types';
 
@@ -26,6 +29,8 @@ export const ProductionView: React.FC = () => {
 
   // Video Preview Modal State
   const [previewJob, setPreviewJob] = useState<RenderJob | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState<boolean>(true);
 
   // Render Trigger Modal State
   const [isRenderModalOpen, setIsRenderModalOpen] = useState<boolean>(false);
@@ -240,15 +245,14 @@ export const ProductionView: React.FC = () => {
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2.5">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider ${
-                          job.status === 'completed'
-                            ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
-                            : job.status === 'rendering'
+                        className={`rounded-full px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider ${job.status === 'completed'
+                          ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
+                          : job.status === 'rendering'
                             ? 'bg-amber-950/60 text-amber-400 border border-amber-500/30'
                             : job.status === 'failed'
-                            ? 'bg-red-950/60 text-red-400 border border-red-500/30'
-                            : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                        }`}
+                              ? 'bg-red-950/60 text-red-400 border border-red-500/30'
+                              : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                          }`}
                       >
                         {job.status}
                       </span>
@@ -278,15 +282,30 @@ export const ProductionView: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {job.status === 'completed' && job.output_file_path && (
-                      <button
-                        onClick={() => setPreviewJob(job)}
-                        className="flex items-center gap-2 rounded-lg bg-vantyx-accent/15 border border-vantyx-accent/40 px-3.5 py-1.5 text-xs font-medium text-vantyx-accent hover:bg-vantyx-accent/25 transition-all"
-                      >
-                        <Play size={13} />
-                        <span>Preview Short</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            setPreviewJob(job);
+                            setPreviewError(null);
+                            setPreviewLoading(true);
+                          }}
+                          className="flex items-center gap-1.5 rounded-lg bg-vantyx-accent/15 border border-vantyx-accent/40 px-3 py-1.5 text-xs font-medium text-vantyx-accent hover:bg-vantyx-accent/25 transition-all"
+                        >
+                          <Play size={13} />
+                          <span>Preview Short</span>
+                        </button>
+                        <a
+                          href={getRenderDownloadUrl(job.id)}
+                          download
+                          className="flex items-center gap-1.5 rounded-lg bg-vantyx-surface border border-vantyx-border px-3 py-1.5 text-xs font-medium text-vantyx-textMuted hover:text-vantyx-textPrimary hover:border-vantyx-borderActive transition-all"
+                          title="Download MP4"
+                        >
+                          <Download size={13} />
+                          <span>Download</span>
+                        </a>
+                      </>
                     )}
                   </div>
                 </div>
@@ -308,7 +327,10 @@ export const ProductionView: React.FC = () => {
                 </h3>
               </div>
               <button
-                onClick={() => setPreviewJob(null)}
+                onClick={() => {
+                  setPreviewJob(null);
+                  setPreviewError(null);
+                }}
                 className="text-vantyx-textMuted hover:text-vantyx-textPrimary"
               >
                 <X size={18} />
@@ -316,19 +338,50 @@ export const ProductionView: React.FC = () => {
             </div>
 
             {/* 9:16 Video Player Container */}
-            <div className="relative aspect-[9/16] w-[270px] max-h-[480px] overflow-hidden rounded-xl border border-vantyx-border bg-black shadow-inner">
-              <video
-                src={getRenderStreamUrl(previewJob.id)}
-                controls
-                autoPlay
-                className="h-full w-full object-cover"
-              />
+            <div className="relative aspect-[9/16] w-[270px] max-h-[480px] overflow-hidden rounded-xl border border-vantyx-border bg-black shadow-inner flex items-center justify-center">
+              {previewLoading && !previewError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 z-10">
+                  <RefreshCw size={24} className="animate-spin text-vantyx-accent" />
+                  <span className="mt-2 text-xs font-mono text-vantyx-textMuted">Loading media stream...</span>
+                </div>
+              )}
+
+              {previewError ? (
+                <div className="flex flex-col items-center justify-center p-4 text-center">
+                  <VideoOff size={32} className="text-red-400" />
+                  <p className="mt-2 text-xs font-medium text-red-400">{previewError}</p>
+                  <p className="mt-1 text-[11px] text-vantyx-textMuted">
+                    The rendered file may have been moved or removed from disk.
+                  </p>
+                </div>
+              ) : (
+                <video
+                  src={getRenderStreamUrl(previewJob.id)}
+                  controls
+                  autoPlay
+                  playsInline
+                  onLoadedData={() => setPreviewLoading(false)}
+                  onError={() => {
+                    setPreviewLoading(false);
+                    setPreviewError('Unable to load video stream (file missing or corrupt).');
+                  }}
+                  className="h-full w-full object-cover"
+                />
+              )}
             </div>
 
-            <div className="mt-3 w-full text-center">
-              <span className="font-mono text-xs text-vantyx-textMuted">
-                1080x1920 • 9:16 Vertical • EBU R128 Normalized
+            <div className="mt-3 w-full flex items-center justify-between">
+              <span className="font-mono text-[11px] text-vantyx-textMuted">
+                1080x1920 • 9:16 Vertical
               </span>
+              <a
+                href={getRenderDownloadUrl(previewJob.id)}
+                download
+                className="flex items-center gap-1.5 rounded bg-vantyx-surfaceElevated border border-vantyx-border px-2.5 py-1 text-xs font-medium text-vantyx-accent hover:border-vantyx-accent transition-colors"
+              >
+                <Download size={12} />
+                <span>Download MP4</span>
+              </a>
             </div>
           </div>
         </div>
@@ -377,11 +430,10 @@ export const ProductionView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setLayoutStyle('blurred_backdrop')}
-                    className={`flex flex-col rounded-lg border p-3 text-left transition-all ${
-                      layoutStyle === 'blurred_backdrop'
-                        ? 'border-vantyx-accent bg-vantyx-accent/10 text-vantyx-accent'
-                        : 'border-vantyx-border bg-vantyx-surfaceElevated text-vantyx-textMuted'
-                    }`}
+                    className={`flex flex-col rounded-lg border p-3 text-left transition-all ${layoutStyle === 'blurred_backdrop'
+                      ? 'border-vantyx-accent bg-vantyx-accent/10 text-vantyx-accent'
+                      : 'border-vantyx-border bg-vantyx-surfaceElevated text-vantyx-textMuted'
+                      }`}
                   >
                     <span className="text-xs font-medium text-vantyx-textPrimary">Blurred Backdrop</span>
                     <span className="text-[10px] text-vantyx-textMuted mt-0.5">
@@ -392,11 +444,10 @@ export const ProductionView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setLayoutStyle('crop_center')}
-                    className={`flex flex-col rounded-lg border p-3 text-left transition-all ${
-                      layoutStyle === 'crop_center'
-                        ? 'border-vantyx-accent bg-vantyx-accent/10 text-vantyx-accent'
-                        : 'border-vantyx-border bg-vantyx-surfaceElevated text-vantyx-textMuted'
-                    }`}
+                    className={`flex flex-col rounded-lg border p-3 text-left transition-all ${layoutStyle === 'crop_center'
+                      ? 'border-vantyx-accent bg-vantyx-accent/10 text-vantyx-accent'
+                      : 'border-vantyx-border bg-vantyx-surfaceElevated text-vantyx-textMuted'
+                      }`}
                   >
                     <span className="text-xs font-medium text-vantyx-textPrimary">Center Crop</span>
                     <span className="text-[10px] text-vantyx-textMuted mt-0.5">

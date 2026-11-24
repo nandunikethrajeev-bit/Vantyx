@@ -13,11 +13,16 @@ vi.mock('@/lib/api', () => ({
   updateCreator: vi.fn(),
   importManualSource: vi.fn(),
   updateSourceRights: vi.fn(),
+  fetchIntakeBatches: vi.fn(() => Promise.resolve([])),
+  submitBatchIntake: vi.fn(),
+  uploadSourceMedia: vi.fn(),
+  linkSourceLocalMedia: vi.fn(),
 }));
 
 describe('DiscoveryView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(api.fetchIntakeBatches).mockResolvedValue([]);
     vi.mocked(api.fetchCreators).mockResolvedValue([
       {
         id: 1,

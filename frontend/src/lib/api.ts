@@ -18,6 +18,14 @@ import {
   RightsRecord,
   VideoScene,
   VideoSource,
+  BatchIntakeResponse,
+  BatchItemResponse,
+  CreatorAssetAssociationResponse,
+  CreatorAuditLogResponse,
+  CreatorOAuthInitiateResponse,
+  CreatorOAuthStatusResponse,
+  CreatorVaultStatusResponse,
+  UnifiedOutputItem,
   WorkflowRun,
   YouTubeAccount,
   ChannelAnalyticsOverview,
@@ -130,6 +138,76 @@ export async function discoverCreatorVideos(creatorId: number): Promise<VideoSou
   });
 }
 
+// ---------------- Creator YouTube OAuth & Vault API ----------------
+
+export async function initiateCreatorOAuth(
+  creatorId: number,
+  redirectUri?: string
+): Promise<CreatorOAuthInitiateResponse> {
+  const query = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
+  return await request<CreatorOAuthInitiateResponse>(`/api/v1/discovery/creators/${creatorId}/oauth/authorize${query}`, {
+    method: 'POST',
+  });
+}
+
+export async function submitCreatorOAuthCallback(
+  creatorId: number,
+  code: string,
+  state: string
+): Promise<CreatorOAuthStatusResponse> {
+  return await request<CreatorOAuthStatusResponse>(`/api/v1/discovery/creators/${creatorId}/oauth/callback`, {
+    method: 'POST',
+    body: JSON.stringify({ code, state }),
+  });
+}
+
+export async function fetchCreatorOAuthStatus(creatorId: number): Promise<CreatorOAuthStatusResponse> {
+  return await request<CreatorOAuthStatusResponse>(`/api/v1/discovery/creators/${creatorId}/oauth/status`);
+}
+
+export async function refreshCreatorOAuthToken(creatorId: number): Promise<CreatorOAuthStatusResponse> {
+  return await request<CreatorOAuthStatusResponse>(`/api/v1/discovery/creators/${creatorId}/oauth/refresh`, {
+    method: 'POST',
+  });
+}
+
+export async function revokeCreatorOAuth(creatorId: number, reason?: string): Promise<CreatorOAuthStatusResponse> {
+  const query = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+  return await request<CreatorOAuthStatusResponse>(`/api/v1/discovery/creators/${creatorId}/oauth/revoke${query}`, {
+    method: 'POST',
+  });
+}
+
+export async function disconnectCreatorChannel(creatorId: number): Promise<CreatorOAuthStatusResponse> {
+  return await request<CreatorOAuthStatusResponse>(`/api/v1/discovery/creators/${creatorId}/oauth/disconnect`, {
+    method: 'POST',
+  });
+}
+
+export async function fetchCreatorAuditLogs(creatorId: number, limit = 50): Promise<CreatorAuditLogResponse[]> {
+  return await request<CreatorAuditLogResponse[]>(`/api/v1/discovery/creators/${creatorId}/audit-logs?limit=${limit}`);
+}
+
+export async function fetchCreatorVaultStatus(creatorId: number): Promise<CreatorVaultStatusResponse> {
+  return await request<CreatorVaultStatusResponse>(`/api/v1/discovery/creators/${creatorId}/vault/status`);
+}
+
+export async function associateCreatorAsset(
+  creatorId: number,
+  data: { video_id: string; asset_filename: string; notes?: string }
+): Promise<CreatorAssetAssociationResponse> {
+  return await request<CreatorAssetAssociationResponse>(`/api/v1/discovery/creators/${creatorId}/assets/associate`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteCreatorAssetAssociation(creatorId: number, associationId: number): Promise<void> {
+  await request<void>(`/api/v1/discovery/creators/${creatorId}/assets/${associationId}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function runGlobalDiscovery(): Promise<DiscoveryRunResult> {
   return await request<DiscoveryRunResult>('/api/v1/discovery/run', {
     method: 'POST',
@@ -145,6 +223,66 @@ export async function fetchVideoSources(creatorId?: number, eligibleOnly = false
   if (eligibleOnly) params.append('eligible_only', 'true');
   if (params.toString()) url += `?${params.toString()}`;
   return await request<VideoSource[]>(url);
+}
+
+export async function submitBatchIntake(urls: string[], notes?: string, autoProcess = true): Promise<BatchIntakeResponse> {
+  const url = `/api/v1/discovery/sources/batch${autoProcess ? '?auto_process=true' : ''}`;
+  return await request<BatchIntakeResponse>(url, {
+    method: 'POST',
+    body: JSON.stringify({ urls, notes }),
+  });
+}
+
+export async function triggerBatchProcess(batchId: string): Promise<BatchIntakeResponse> {
+  return await request<BatchIntakeResponse>(`/api/v1/discovery/batches/${batchId}/process`, {
+    method: 'POST',
+  });
+}
+
+export async function retryBatchItem(itemId: number): Promise<BatchItemResponse> {
+  return await request<BatchItemResponse>(`/api/v1/discovery/batches/items/${itemId}/retry`, {
+    method: 'POST',
+  });
+}
+
+export async function fetchIntakeBatches(limit = 20): Promise<BatchIntakeResponse[]> {
+  return await request<BatchIntakeResponse[]>(`/api/v1/discovery/batches?limit=${limit}`);
+}
+
+export async function fetchIntakeBatch(batchId: string): Promise<BatchIntakeResponse> {
+  return await request<BatchIntakeResponse>(`/api/v1/discovery/batches/${batchId}`);
+}
+
+export async function linkSourceLocalMedia(sourceId: number, localPath: string): Promise<VideoSource> {
+  return await request<VideoSource>(`/api/v1/discovery/sources/${sourceId}/link-local`, {
+    method: 'POST',
+    body: JSON.stringify({ local_path: localPath }),
+  });
+}
+
+export async function uploadSourceMedia(sourceId: number, file: File): Promise<VideoSource> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/discovery/sources/${sourceId}/media?filename=${encodeURIComponent(file.name)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'X-Filename': file.name,
+      },
+      body: file,
+    }
+  );
+  if (!response.ok) {
+    let err = `HTTP ${response.status}`;
+    try {
+      const j = await response.json();
+      err = j.detail || err;
+    } catch {
+      // ignore
+    }
+    throw new Error(err);
+  }
+  return await response.json();
 }
 
 export async function importManualSource(data: {
@@ -276,6 +414,10 @@ export async function fetchRenderJobs(status?: string, limit = 50): Promise<Rend
   return await request<RenderJob[]>(url);
 }
 
+export async function fetchUnifiedOutputs(limit = 50): Promise<UnifiedOutputItem[]> {
+  return await request<UnifiedOutputItem[]>(`/api/v1/production/outputs?limit=${limit}`);
+}
+
 export async function getRenderJob(jobId: number): Promise<RenderJob> {
   return await request<RenderJob>(`/api/v1/production/jobs/${jobId}`);
 }
@@ -286,6 +428,10 @@ export function getRenderStreamUrl(jobId: number): string {
 
 export function getRenderThumbnailUrl(jobId: number): string {
   return `${API_BASE_URL}/api/v1/production/jobs/${jobId}/thumbnail`;
+}
+
+export function getRenderDownloadUrl(jobId: number): string {
+  return `${API_BASE_URL}/api/v1/production/jobs/${jobId}/download`;
 }
 
 // ---------------- Distribution & Publishing API ----------------

@@ -9,6 +9,7 @@ vi.mock('@/lib/api', () => ({
   triggerRender: vi.fn(),
   getRenderStreamUrl: vi.fn((id: number) => `/api/v1/production/jobs/${id}/stream`),
   getRenderThumbnailUrl: vi.fn((id: number) => `/api/v1/production/jobs/${id}/thumbnail`),
+  getRenderDownloadUrl: vi.fn((id: number) => `/api/v1/production/jobs/${id}/download`),
 }));
 
 describe('ProductionView', () => {

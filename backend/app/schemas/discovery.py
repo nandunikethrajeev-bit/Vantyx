@@ -39,10 +39,93 @@ class CreatorUpdate(BaseModel):
 
 class CreatorResponse(CreatorBase):
     id: int
+    oauth_status: str = "disconnected"
+    google_account_email: Optional[str] = None
+    verified_channel_id: Optional[str] = None
+    verified_channel_title: Optional[str] = None
+    verified_at: Optional[datetime] = None
+    is_revoked: bool = False
+    revoked_at: Optional[datetime] = None
+    revocation_reason: Optional[str] = None
+    token_expires_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------- Creator OAuth & Ownership Schemas ----------------
+
+class CreatorOAuthInitiateResponse(BaseModel):
+    configured: bool
+    authorization_url: Optional[str] = None
+    state: Optional[str] = None
+    message: str
+    mock_available: bool = False
+
+
+class CreatorOAuthCallbackRequest(BaseModel):
+    code: str
+    state: str
+
+
+class CreatorOAuthStatusResponse(BaseModel):
+    creator_id: int
+    creator_name: str
+    channel_id: str
+    oauth_status: str
+    google_account_email: Optional[str] = None
+    verified_channel_id: Optional[str] = None
+    verified_channel_title: Optional[str] = None
+    is_ownership_verified: bool = False
+    is_revoked: bool = False
+    token_expires_at: Optional[datetime] = None
+    is_token_expired: bool = False
+    verified_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+    message: str
+
+
+class CreatorAuditLogResponse(BaseModel):
+    id: int
+    creator_id: int
+    event_type: str
+    channel_id: Optional[str] = None
+    details: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CreatorAssetAssociationCreate(BaseModel):
+    video_id: str = Field(..., min_length=11, max_length=128, description="YouTube Video ID")
+    asset_filename: str = Field(..., min_length=1, max_length=255, description="Filename of master video in vault")
+    notes: Optional[str] = Field(None, description="Optional association metadata")
+
+
+class CreatorAssetAssociationResponse(BaseModel):
+    id: int
+    creator_id: int
+    video_id: str
+    asset_filename: str
+    asset_path: str
+    file_size_bytes: int
+    duration_seconds: float
+    is_verified: bool
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CreatorVaultStatusResponse(BaseModel):
+    creator_id: int
+    vault_directory: str
+    total_files: int
+    total_size_bytes: int
+    files: List[Dict[str, Any]]
+    associations: List[CreatorAssetAssociationResponse]
 
 
 # ---------------- Rights Record Schemas ----------------
@@ -98,6 +181,7 @@ class VideoSourceBase(BaseModel):
     discovery_method: str = Field(default="manual_import")
     local_video_path: Optional[str] = None
     is_synthetic: bool = False
+    raw_metadata: Optional[Dict[str, Any]] = None
 
 
 class VideoSourceCreate(VideoSourceBase):
@@ -111,12 +195,17 @@ class VideoSourceResponse(VideoSourceBase):
     creator_id: Optional[int]
     creator_name: Optional[str] = None
     local_video_path: Optional[str] = None
+    media_status: str = Field(default="awaiting_media", description="ready | awaiting_media | missing")
     rights: Optional[RightsRecordResponse] = None
     is_eligible: bool = False
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LinkLocalMediaInput(BaseModel):
+    local_path: str = Field(..., min_length=1, max_length=1024, description="Local path to authorized media file")
 
 
 # ---------------- Operation Results ----------------
@@ -164,6 +253,11 @@ class BatchItemResponse(BaseModel):
     canonical_url: Optional[str] = None
     video_id: Optional[str] = None
     source_id: Optional[int] = None
+    source_title: Optional[str] = None
+    creator_name: Optional[str] = None
+    source_category: Optional[str] = None
+    source_provider: Optional[str] = None
+    media_status: Optional[str] = None
     status: str
     is_eligible: bool = False
     permission_status: str = "pending"

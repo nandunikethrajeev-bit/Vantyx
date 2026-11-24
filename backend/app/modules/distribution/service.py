@@ -284,8 +284,10 @@ class DistributionService:
         if not rights.commercial_use_allowed:
             raise PublishingEligibilityError("Commercial use is not permitted for this source media.")
 
-        if rights.expires_at and rights.expires_at < datetime.now(timezone.utc):
-            raise PublishingEligibilityError(f"Commercial rights expired on {rights.expires_at}.")
+        if rights.expires_at:
+            exp_tz = rights.expires_at if rights.expires_at.tzinfo else rights.expires_at.replace(tzinfo=timezone.utc)
+            if exp_tz < datetime.now(timezone.utc):
+                raise PublishingEligibilityError(f"Commercial rights expired on {rights.expires_at}.")
 
         # 7. Prevent Duplicate Scheduling
         dup_stmt = select(PublishSchedule).where(
@@ -375,7 +377,8 @@ class DistributionService:
             for s in all_schedules:
                 if s.slot_name == slot_name:
                     # Check if date matches
-                    s_local = s.scheduled_time.astimezone(TimezoneHelper.KOLKATA_TZ).strftime("%Y-%m-%d")
+                    s_utc = s.scheduled_time if s.scheduled_time.tzinfo else s.scheduled_time.replace(tzinfo=timezone.utc)
+                    s_local = s_utc.astimezone(TimezoneHelper.KOLKATA_TZ).strftime("%Y-%m-%d")
                     if s_local == target_date_str:
                         matched_schedule = s
                         break

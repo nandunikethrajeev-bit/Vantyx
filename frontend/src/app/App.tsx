@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { UrlWorkspaceView } from '@/features/url_workspace/UrlWorkspaceView';
+import { OutputsStudioView } from '@/features/outputs/OutputsStudioView';
 import { OverviewView } from '@/features/overview/OverviewView';
 import { DiscoveryView } from '@/features/discovery/DiscoveryView';
 import { IntelligenceView } from '@/features/intelligence/IntelligenceView';
@@ -13,8 +15,10 @@ import { ModulePlaceholderView } from '@/features/placeholders/ModulePlaceholder
 import { useSystemHealth } from '@/hooks/useSystemHealth';
 import { NavigationSection } from '@/types';
 
-export const App: React.FC = () => {
-  const [currentSection, setCurrentSection] = useState<NavigationSection>('overview');
+export const App: React.FC<{ initialSection?: NavigationSection }> = ({
+  initialSection = 'overview',
+}) => {
+  const [currentSection, setCurrentSection] = useState<NavigationSection>(initialSection);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
   const {
@@ -51,6 +55,12 @@ export const App: React.FC = () => {
 
         {/* Central Workspace Scroll Area */}
         <main className="flex-1 overflow-y-auto px-8 py-8">
+          {currentSection === 'url_workspace' && (
+            <UrlWorkspaceView onNavigate={setCurrentSection} />
+          )}
+          {currentSection === 'outputs' && (
+            <OutputsStudioView onNavigate={setCurrentSection} />
+          )}
           {currentSection === 'overview' && (
             <OverviewView
               connectionState={connectionState}
@@ -66,7 +76,9 @@ export const App: React.FC = () => {
           {currentSection === 'distribution' && <DistributionView />}
           {currentSection === 'orchestration' && <OrchestrationView />}
           {currentSection === 'analytics' && <AnalyticsView />}
-          {currentSection !== 'overview' &&
+          {currentSection !== 'url_workspace' &&
+            currentSection !== 'outputs' &&
+            currentSection !== 'overview' &&
             currentSection !== 'discovery' &&
             currentSection !== 'intelligence' &&
             currentSection !== 'selection' &&

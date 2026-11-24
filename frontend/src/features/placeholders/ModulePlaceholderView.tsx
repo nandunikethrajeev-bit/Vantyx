@@ -15,6 +15,18 @@ const MODULE_DETAILS: Record<
     plannedResponsibilities: string[];
   }
 > = {
+  url_workspace: {
+    name: 'URL Studio',
+    milestone: 'Milestone 10',
+    description: 'Autonomous batch intake, metadata resolution, and end-to-end pipeline.',
+    plannedResponsibilities: ['Batch URL intake', 'oEmbed & creator resolution', 'Autonomous orchestration'],
+  },
+  outputs: {
+    name: 'Outputs Studio',
+    milestone: 'Milestone 10',
+    description: 'Unified 9:16 Shorts gallery, video player, and file downloads.',
+    plannedResponsibilities: ['Playback streaming', 'MP4 download', 'Output verification'],
+  },
   overview: {
     name: 'Overview',
     milestone: 'Milestone 01',

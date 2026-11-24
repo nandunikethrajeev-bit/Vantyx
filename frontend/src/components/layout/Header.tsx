@@ -12,6 +12,14 @@ interface HeaderProps {
 }
 
 const SECTION_TITLES: Record<NavigationSection, { title: string; subtitle: string }> = {
+  url_workspace: {
+    title: 'Autonomous URL Studio',
+    subtitle: 'End-to-end URL-to-Shorts batch processing and pipeline execution',
+  },
+  outputs: {
+    title: 'Unified Outputs Studio',
+    subtitle: 'Inspect, play, and download verified 9:16 vertical Shorts',
+  },
   overview: {
     title: 'Platform Foundation',
     subtitle: 'System core status and architectural verification',

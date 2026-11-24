@@ -25,6 +25,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager for initialization and graceful teardown."""
     logger.info(f"Initializing {settings.PROJECT_NAME} backend in [{settings.ENVIRONMENT}] environment")
     logger.info(f"Loaded CORS origins: {settings.CORS_ORIGINS}")
+    from app.core.security import validate_token_encryption_configuration
+    is_prod = settings.ENVIRONMENT.lower() == "production"
+    valid, msg = validate_token_encryption_configuration(is_production=is_prod)
+    if not valid:
+        logger.warning(f"Security Notice: {msg}")
     try:
         await init_db()
     except Exception as exc:

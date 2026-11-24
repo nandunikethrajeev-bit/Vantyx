@@ -13,6 +13,7 @@ import {
   Database,
   Server,
   Activity,
+  Film,
 } from 'lucide-react';
 import { NavigationSection, ConnectionState } from '@/types';
 import { BrandMark } from '../ui/BrandMark';
@@ -33,6 +34,8 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { id: 'url_workspace', label: 'URL Studio', icon: Sparkles, badge: 'AUTO' },
+  { id: 'outputs', label: 'Outputs', icon: Film, badge: 'HD' },
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'orchestration', label: 'Orchestration', icon: Activity, badge: 'M07' },
   { id: 'discovery', label: 'Discovery', icon: Radio, badge: 'M02' },

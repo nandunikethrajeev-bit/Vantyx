@@ -57,6 +57,18 @@ async def list_render_jobs(
 
 
 @router.get(
+    "/outputs",
+    summary="List Unified Rendered Shorts Outputs Gallery",
+)
+async def list_outputs(
+    limit: int = Query(50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.modules.orchestration.pipeline_engine import AutonomousPipelineService
+    return await AutonomousPipelineService.list_outputs(db, limit=limit)
+
+
+@router.get(
     "/jobs/{job_id}",
     response_model=RenderJobResponse,
     summary="Get Render Job Details",
@@ -71,6 +83,21 @@ async def get_render_job(
     return RenderJobResponse.model_validate(job)
 
 
+def _is_safe_path(target_path: Path) -> bool:
+    """Validate that target_path falls safely inside allowed application directories."""
+    resolved_target = target_path.resolve()
+    allowed_roots = [
+        Path(settings.DATA_DIR).resolve(),
+        Path(settings.EXPORT_DIR).resolve(),
+        Path(settings.MEDIA_DIR).resolve(),
+        Path("storage").resolve(),
+    ]
+    return any(
+        root == resolved_target or root in resolved_target.parents
+        for root in allowed_roots
+    )
+
+
 @router.get(
     "/jobs/{job_id}/stream",
     summary="Stream Rendered 9:16 Short Video File",
@@ -83,20 +110,48 @@ async def stream_render_job(
     if not job or not job.output_file_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Render job or file not found")
     
-    # Path traversal protection
-    export_dir = Path(settings.EXPORT_DIR).resolve()
-    data_dir = Path(settings.DATA_DIR).resolve()
     target_path = Path(job.output_file_path).resolve()
-    if export_dir not in target_path.parents and data_dir not in target_path.parents and target_path != export_dir and target_path != data_dir:
+    if not _is_safe_path(target_path):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: path traversal detected")
 
-    if not os.path.exists(job.output_file_path):
+    if not target_path.exists() or target_path.stat().st_size == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rendered video file is missing on disk")
 
     return FileResponse(
-        path=job.output_file_path,
+        path=str(target_path),
         media_type="video/mp4",
-        filename=os.path.basename(job.output_file_path),
+        filename=target_path.name,
+        headers={"Accept-Ranges": "bytes"},
+    )
+
+
+@router.get(
+    "/jobs/{job_id}/download",
+    summary="Download Rendered 9:16 Short Video File",
+)
+async def download_render_job(
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    job = await ProductionService.get_job(db, job_id)
+    if not job or not job.output_file_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Render job or file not found")
+    
+    target_path = Path(job.output_file_path).resolve()
+    if not _is_safe_path(target_path):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: path traversal detected")
+
+    if not target_path.exists() or target_path.stat().st_size == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rendered video file is missing on disk")
+
+    return FileResponse(
+        path=str(target_path),
+        media_type="video/mp4",
+        filename=target_path.name,
+        headers={
+            "Content-Disposition": f'attachment; filename="{target_path.name}"',
+            "Accept-Ranges": "bytes",
+        },
     )
 
 
@@ -112,18 +167,15 @@ async def stream_render_thumbnail(
     if not job or not job.thumbnail_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thumbnail not found")
 
-    # Path traversal protection
-    export_dir = Path(settings.EXPORT_DIR).resolve()
-    data_dir = Path(settings.DATA_DIR).resolve()
     thumb_path = Path(job.thumbnail_path).resolve()
-    if export_dir not in thumb_path.parents and data_dir not in thumb_path.parents and thumb_path != export_dir and thumb_path != data_dir:
+    if not _is_safe_path(thumb_path):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: path traversal detected")
 
-    if not os.path.exists(job.thumbnail_path):
+    if not thumb_path.exists() or thumb_path.stat().st_size == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thumbnail image is missing on disk")
 
     return FileResponse(
-        path=job.thumbnail_path,
+        path=str(thumb_path),
         media_type="image/jpeg",
-        filename=os.path.basename(job.thumbnail_path),
+        filename=thumb_path.name,
     )

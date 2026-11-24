@@ -12,6 +12,10 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  HardDrive,
+  AlertTriangle,
+  ListPlus,
+  Key,
 } from 'lucide-react';
 import {
   createCreator,
@@ -23,13 +27,19 @@ import {
   runGlobalDiscovery,
   updateCreator,
   updateSourceRights,
+  fetchIntakeBatches,
+  submitBatchIntake,
+  uploadSourceMedia,
+  linkSourceLocalMedia,
 } from '@/lib/api';
-import { Creator, VideoSource } from '@/types';
+import { Creator, VideoSource, BatchIntakeResponse } from '@/types';
+import { CreatorOAuthVaultModal } from './CreatorOAuthVaultModal';
 
 export const DiscoveryView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'sources' | 'creators'>('sources');
+  const [activeTab, setActiveTab] = useState<'sources' | 'creators' | 'batches'>('sources');
   const [creators, setCreators] = useState<Creator[]>([]);
   const [sources, setSources] = useState<VideoSource[]>([]);
+  const [batches, setBatches] = useState<BatchIntakeResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [discovering, setDiscovering] = useState<boolean>(false);
   const [filterEligible, setFilterEligible] = useState<boolean>(false);
@@ -39,6 +49,20 @@ export const DiscoveryView: React.FC = () => {
   const [showCreatorModal, setShowCreatorModal] = useState<boolean>(false);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
   const [editingRightsSource, setEditingRightsSource] = useState<VideoSource | null>(null);
+  const [attachMediaSource, setAttachMediaSource] = useState<VideoSource | null>(null);
+  const [selectedManageCreator, setSelectedManageCreator] = useState<Creator | null>(null);
+
+  // Batch Intake State
+  const [batchInput, setBatchInput] = useState<string>('');
+  const [batchNotes, setBatchNotes] = useState<string>('');
+  const [submittingBatch, setSubmittingBatch] = useState<boolean>(false);
+  const [activeBatchResult, setActiveBatchResult] = useState<BatchIntakeResponse | null>(null);
+
+  // Attach Media State
+  const [attachMode, setAttachMode] = useState<'upload' | 'link'>('upload');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [localPathInput, setLocalPathInput] = useState<string>('');
+  const [attachingMedia, setAttachingMedia] = useState<boolean>(false);
 
   // Creator form state
   const [newCreator, setNewCreator] = useState({
@@ -74,12 +98,14 @@ export const DiscoveryView: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [cData, sData] = await Promise.all([
+      const [cData, sData, bData] = await Promise.all([
         fetchCreators(),
         fetchVideoSources(undefined, filterEligible),
+        fetchIntakeBatches(20),
       ]);
       setCreators(cData);
       setSources(sData);
+      setBatches(bData);
       setMessage(null);
     } catch (err) {
       setMessage({
@@ -88,6 +114,74 @@ export const DiscoveryView: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmitBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const urls = batchInput
+      .split('\n')
+      .map((u) => u.trim())
+      .filter((u) => u.length > 0);
+
+    if (urls.length === 0) {
+      setMessage({ type: 'error', text: 'Please enter at least one YouTube URL.' });
+      return;
+    }
+    if (urls.length > 20) {
+      setMessage({ type: 'error', text: 'Batch exceeds maximum limit of 20 URLs.' });
+      return;
+    }
+
+    setSubmittingBatch(true);
+    setMessage(null);
+    try {
+      const res = await submitBatchIntake(urls, batchNotes || undefined);
+      setActiveBatchResult(res);
+      setBatchInput('');
+      setBatchNotes('');
+      setMessage({
+        type: 'success',
+        text: `Batch ${res.batch_id.slice(0, 8)} processed: ${res.total_valid} valid, ${res.total_duplicates} duplicates, ${res.total_invalid} invalid.`,
+      });
+      await loadData();
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Batch intake failed.' });
+    } finally {
+      setSubmittingBatch(false);
+    }
+  };
+
+  const handleAttachMediaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!attachMediaSource) return;
+
+    setAttachingMedia(true);
+    setMessage(null);
+    try {
+      if (attachMode === 'upload') {
+        if (!selectedFile) {
+          throw new Error('Please select a video file to upload.');
+        }
+        await uploadSourceMedia(attachMediaSource.id, selectedFile);
+      } else {
+        if (!localPathInput.trim()) {
+          throw new Error('Please enter a local file path.');
+        }
+        await linkSourceLocalMedia(attachMediaSource.id, localPathInput.trim());
+      }
+      setMessage({
+        type: 'success',
+        text: `Media successfully associated with "${attachMediaSource.title}".`,
+      });
+      setAttachMediaSource(null);
+      setSelectedFile(null);
+      setLocalPathInput('');
+      await loadData();
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Failed to attach media.' });
+    } finally {
+      setAttachingMedia(false);
     }
   };
 
@@ -386,6 +480,20 @@ export const DiscoveryView: React.FC = () => {
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-vantyx-accent" />
             )}
           </button>
+
+          <button
+            onClick={() => setActiveTab('batches')}
+            className={`pb-3 text-xs font-mono transition-colors relative ${
+              activeTab === 'batches'
+                ? 'text-vantyx-accent font-medium'
+                : 'text-vantyx-textMuted hover:text-vantyx-textPrimary'
+            }`}
+          >
+            Batch URL Intake ({batches.length})
+            {activeTab === 'batches' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-vantyx-accent" />
+            )}
+          </button>
         </div>
 
         {activeTab === 'sources' && (
@@ -440,6 +548,7 @@ export const DiscoveryView: React.FC = () => {
                     <th className="py-3 px-4">Video</th>
                     <th className="py-3 px-4">Creator / Source</th>
                     <th className="py-3 px-4">Duration</th>
+                    <th className="py-3 px-4">Media Asset</th>
                     <th className="py-3 px-4">Permission Status</th>
                     <th className="py-3 px-4">Commercial Rights</th>
                     <th className="py-3 px-4">Eligibility Gate</th>
@@ -449,6 +558,7 @@ export const DiscoveryView: React.FC = () => {
                 <tbody className="divide-y divide-vantyx-border font-mono">
                   {sources.map((src) => {
                     const statusVal = src.rights?.permission_status || 'pending';
+                    const mediaStatus = src.media_status || (src.local_video_path ? 'ready' : 'awaiting_media');
                     return (
                       <tr key={src.id} className="hover:bg-vantyx-surfaceElevated/30 transition-colors">
                         <td className="py-3 px-4">
@@ -492,6 +602,25 @@ export const DiscoveryView: React.FC = () => {
                         </td>
 
                         <td className="py-3 px-4">
+                          {mediaStatus === 'ready' ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase border border-emerald-500/30 text-emerald-400 bg-emerald-500/10"
+                              title={src.local_video_path || ''}
+                            >
+                              <HardDrive size={10} /> Media Ready
+                            </span>
+                          ) : mediaStatus === 'missing' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase border border-rose-500/30 text-rose-400 bg-rose-500/10">
+                              <AlertTriangle size={10} /> File Missing
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase border border-amber-500/30 text-amber-400 bg-amber-500/10">
+                              <Clock size={10} /> Awaiting File
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-4">
                           <span
                             className={`inline-block px-2 py-0.5 rounded text-[10px] uppercase border ${
                               statusVal === 'authorized' || statusVal === 'own_gameplay'
@@ -530,12 +659,25 @@ export const DiscoveryView: React.FC = () => {
                         </td>
 
                         <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => openRightsEditor(src)}
-                            className="rounded border border-vantyx-border px-2.5 py-1 text-[11px] text-vantyx-textSecondary hover:border-vantyx-accent hover:text-vantyx-textPrimary"
-                          >
-                            Manage Rights
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setAttachMediaSource(src);
+                                setSelectedFile(null);
+                                setLocalPathInput(src.local_video_path || '');
+                              }}
+                              className="rounded border border-vantyx-border px-2 py-1 text-[11px] text-vantyx-accent hover:border-vantyx-accent transition-colors"
+                              title="Attach authorized video file"
+                            >
+                              Attach Media
+                            </button>
+                            <button
+                              onClick={() => openRightsEditor(src)}
+                              className="rounded border border-vantyx-border px-2 py-1 text-[11px] text-vantyx-textSecondary hover:border-vantyx-accent hover:text-vantyx-textPrimary transition-colors"
+                            >
+                              Rights
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -545,7 +687,7 @@ export const DiscoveryView: React.FC = () => {
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === 'creators' ? (
         /* Creators Table */
         <div className="space-y-4">
           <div className="overflow-x-auto rounded border border-vantyx-border bg-vantyx-surface">
@@ -554,6 +696,7 @@ export const DiscoveryView: React.FC = () => {
                 <tr>
                   <th className="py-3 px-4">Creator / Channel</th>
                   <th className="py-3 px-4">Channel ID</th>
+                  <th className="py-3 px-4">OAuth / Ownership</th>
                   <th className="py-3 px-4">Content Category</th>
                   <th className="py-3 px-4">Permission Tier</th>
                   <th className="py-3 px-4">Monitoring</th>
@@ -576,6 +719,31 @@ export const DiscoveryView: React.FC = () => {
 
                     <td className="py-3 px-4 text-vantyx-textMuted text-[11px]">
                       <code className="text-vantyx-textSecondary">{c.channel_id}</code>
+                    </td>
+
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1.5">
+                        {c.oauth_status === 'connected' ? (
+                          <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded font-mono font-semibold">
+                            <CheckCircle2 size={10} />
+                            VERIFIED
+                          </span>
+                        ) : c.oauth_status === 'expired' ? (
+                          <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded font-mono font-semibold">
+                            <Clock size={10} />
+                            EXPIRED
+                          </span>
+                        ) : c.oauth_status === 'revoked' ? (
+                          <span className="flex items-center gap-1 text-[10px] text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded font-mono font-semibold">
+                            <XCircle size={10} />
+                            REVOKED
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-neutral-400 bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded font-mono">
+                            UNLINKED
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="py-3 px-4 text-vantyx-textSecondary">{c.content_category}</td>
@@ -602,6 +770,14 @@ export const DiscoveryView: React.FC = () => {
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => setSelectedManageCreator(c)}
+                          className="rounded border border-vantyx-accent/40 bg-vantyx-accent/10 px-2 py-1 text-[11px] text-vantyx-accent hover:bg-vantyx-accent hover:text-vantyx-background font-medium transition-colors flex items-center gap-1"
+                          title="Manage Google OAuth, Channel Ownership, and Master Media Vault"
+                        >
+                          <Key size={11} />
+                          OAuth & Vault
+                        </button>
+                        <button
                           onClick={() => handleChannelDiscover(c)}
                           disabled={discovering}
                           className="rounded border border-vantyx-border px-2 py-1 text-[11px] text-vantyx-accent hover:border-vantyx-accent/60"
@@ -622,6 +798,183 @@ export const DiscoveryView: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      ) : (
+        /* Batches Tab */
+        <div className="space-y-6">
+          {/* Batch Submission Card */}
+          <div className="rounded border border-vantyx-border bg-vantyx-surface p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-vantyx-border pb-3">
+              <div className="flex items-center gap-2">
+                <ListPlus size={16} className="text-vantyx-accent" />
+                <h3 className="text-sm font-semibold text-vantyx-textPrimary">Batch YouTube URL Intake</h3>
+              </div>
+              <span className="font-mono text-xs text-vantyx-textMuted">Max 20 URLs per batch</span>
+            </div>
+
+            <p className="text-xs text-vantyx-textMuted leading-relaxed">
+              Submit multiple gameplay URLs for autonomous intake. VANTYX will canonicalize each link, extract the 11-character video ID, check duplicate registers, enforce legal rights gates, and ready eligible sources for authorized media attachment.
+            </p>
+
+            <form onSubmit={handleSubmitBatch} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-vantyx-textMuted mb-1.5">
+                  YouTube URLs (One URL per line)
+                </label>
+                <textarea
+                  rows={5}
+                  required
+                  placeholder={"https://www.youtube.com/watch?v=dQw4w9WgXcQ\nhttps://youtu.be/dQw4w9WgXcQ\nhttps://www.youtube.com/shorts/dQw4w9WgXcQ"}
+                  value={batchInput}
+                  onChange={(e) => setBatchInput(e.target.value)}
+                  className="w-full rounded border border-vantyx-border bg-vantyx-bg p-3 font-mono text-xs text-vantyx-textPrimary placeholder:text-vantyx-textMuted/40 focus:border-vantyx-accent focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-vantyx-textMuted mb-1.5">
+                  Batch Ingestion Notes / Mission Tag (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Morning creator intake sweep - Mission 02"
+                  value={batchNotes}
+                  onChange={(e) => setBatchNotes(e.target.value)}
+                  className="w-full rounded border border-vantyx-border bg-vantyx-bg px-3 py-2 text-xs font-mono text-vantyx-textPrimary focus:border-vantyx-accent focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={submittingBatch || !batchInput.trim()}
+                  className="flex items-center gap-2 rounded bg-vantyx-accent px-4 py-2 text-xs font-mono font-medium text-black hover:bg-vantyx-accentHover transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={submittingBatch ? 'animate-spin' : ''} />
+                  <span>{submittingBatch ? 'Validating Batch...' : 'Submit Batch Ingestion'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Active / Latest Batch Breakdown */}
+          {activeBatchResult && (
+            <div className="rounded border border-vantyx-accent/40 bg-vantyx-surface p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-vantyx-border pb-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-400" />
+                  <h3 className="text-sm font-semibold text-vantyx-textPrimary">
+                    Intake Batch Results ({activeBatchResult.batch_id.slice(0, 8)})
+                  </h3>
+                </div>
+                <div className="flex items-center gap-3 text-xs font-mono">
+                  <span className="text-vantyx-textMuted">Submitted: {activeBatchResult.total_submitted}</span>
+                  <span className="text-emerald-400 font-semibold">Valid: {activeBatchResult.total_valid}</span>
+                  <span className="text-amber-400">Duplicates: {activeBatchResult.total_duplicates}</span>
+                  <span className="text-rose-400">Invalid: {activeBatchResult.total_invalid}</span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded border border-vantyx-border bg-vantyx-bg">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="border-b border-vantyx-border bg-vantyx-surfaceElevated/50 text-[10px] uppercase text-vantyx-textMuted">
+                    <tr>
+                      <th className="py-2.5 px-3">Video ID</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Canonical URL</th>
+                      <th className="py-2.5 px-3">Permission</th>
+                      <th className="py-2.5 px-3">Details / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-vantyx-border">
+                    {activeBatchResult.items.map((item) => (
+                      <tr key={item.id} className="hover:bg-vantyx-surfaceElevated/20">
+                        <td className="py-2.5 px-3 font-semibold text-vantyx-textPrimary">
+                          {item.video_id || '--'}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`inline-block px-1.5 py-0.5 rounded text-[10px] uppercase border ${
+                              item.status === 'imported'
+                                ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                                : item.status === 'duplicate'
+                                ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                                : 'border-rose-500/30 text-rose-400 bg-rose-500/10'
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-vantyx-textMuted truncate max-w-xs">
+                          {item.canonical_url || item.raw_url}
+                        </td>
+                        <td className="py-2.5 px-3 text-vantyx-textSecondary">
+                          {item.permission_status || 'unverified'}
+                        </td>
+                        <td className="py-2.5 px-3 text-vantyx-textMuted truncate max-w-xs">
+                          {item.error_message || (item.source_title ? `Source #${item.source_id}: ${item.source_title}` : 'Registered successfully')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Historical Batches Queue */}
+          <div className="rounded border border-vantyx-border bg-vantyx-surface p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-vantyx-border pb-3">
+              <h3 className="text-sm font-semibold text-vantyx-textPrimary">Recent Intake Batches</h3>
+              <span className="font-mono text-xs text-vantyx-textMuted">{batches.length} logged batches</span>
+            </div>
+
+            {batches.length === 0 ? (
+              <p className="py-6 text-center text-xs text-vantyx-textMuted">
+                No batches submitted yet. Paste YouTube URLs above to execute batch intake.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded border border-vantyx-border bg-vantyx-bg">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="border-b border-vantyx-border bg-vantyx-surfaceElevated/50 text-[10px] uppercase text-vantyx-textMuted">
+                    <tr>
+                      <th className="py-2.5 px-3">Batch ID</th>
+                      <th className="py-2.5 px-3">Created</th>
+                      <th className="py-2.5 px-3">Total</th>
+                      <th className="py-2.5 px-3">Valid</th>
+                      <th className="py-2.5 px-3">Duplicates</th>
+                      <th className="py-2.5 px-3">Invalid</th>
+                      <th className="py-2.5 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-vantyx-border">
+                    {batches.map((b) => (
+                      <tr key={b.batch_id} className="hover:bg-vantyx-surfaceElevated/20">
+                        <td className="py-2.5 px-3 font-semibold text-vantyx-textPrimary">
+                          {b.batch_id.slice(0, 8)}...
+                        </td>
+                        <td className="py-2.5 px-3 text-vantyx-textMuted">
+                          {new Date(b.created_at).toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3">{b.total_submitted}</td>
+                        <td className="py-2.5 px-3 text-emerald-400 font-semibold">{b.total_valid}</td>
+                        <td className="py-2.5 px-3 text-amber-400">{b.total_duplicates}</td>
+                        <td className="py-2.5 px-3 text-rose-400">{b.total_invalid}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            onClick={() => setActiveBatchResult(b)}
+                            className="rounded border border-vantyx-border px-2 py-0.5 text-[10px] text-vantyx-accent hover:border-vantyx-accent"
+                          >
+                            Inspect
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -931,6 +1284,128 @@ export const DiscoveryView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* ----------------- Attach Authorized Media Modal ----------------- */}
+      {attachMediaSource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-lg border border-vantyx-border bg-vantyx-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-vantyx-border pb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-vantyx-textPrimary">
+                  Attach Authorized Media File
+                </h3>
+                <span className="text-[11px] font-mono text-vantyx-textMuted truncate block max-w-sm">
+                  Source: {attachMediaSource.title}
+                </span>
+              </div>
+              <button
+                onClick={() => setAttachMediaSource(null)}
+                className="text-vantyx-textMuted hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-vantyx-textMuted leading-relaxed">
+              YouTube URL registration establishes legal rights and metadata records. To execute frame-accurate AI scene indexing, audio waveform analysis, and vertical Shorts rendering, provide the creator-authorized source media file (.mp4, .mov, .mkv).
+            </p>
+
+            <div className="flex rounded border border-vantyx-border bg-vantyx-bg p-1 text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setAttachMode('upload')}
+                className={`flex-1 py-1.5 text-center rounded transition-all ${
+                  attachMode === 'upload'
+                    ? 'bg-vantyx-accent text-black font-semibold'
+                    : 'text-vantyx-textMuted hover:text-vantyx-textPrimary'
+                }`}
+              >
+                Upload File from PC
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttachMode('link')}
+                className={`flex-1 py-1.5 text-center rounded transition-all ${
+                  attachMode === 'link'
+                    ? 'bg-vantyx-accent text-black font-semibold'
+                    : 'text-vantyx-textMuted hover:text-vantyx-textPrimary'
+                }`}
+              >
+                Link Staged Local Path
+              </button>
+            </div>
+
+            <form onSubmit={handleAttachMediaSubmit} className="space-y-4 text-xs font-mono">
+              {attachMode === 'upload' ? (
+                <div>
+                  <label className="block text-vantyx-textMuted mb-2">
+                    Select Gameplay Media File (.mp4, .mov, .mkv, .webm)
+                  </label>
+                  <input
+                    type="file"
+                    accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-vantyx-textPrimary file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:text-xs file:font-mono file:bg-vantyx-surfaceElevated file:text-vantyx-accent hover:file:bg-vantyx-border cursor-pointer"
+                  />
+                  {selectedFile && (
+                    <div className="mt-2 text-[11px] text-emerald-400">
+                      Selected: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(1)} MB)
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-vantyx-textMuted mb-1.5">
+                    Absolute or Workspace Staged Path
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. C:\Users\Niketh Rajeev\Videos\gameplay.mp4"
+                    value={localPathInput}
+                    onChange={(e) => setLocalPathInput(e.target.value)}
+                    className="w-full rounded border border-vantyx-border bg-vantyx-bg px-3 py-2 text-vantyx-textPrimary focus:border-vantyx-accent focus:outline-none"
+                  />
+                  <span className="mt-1 block text-[10px] text-vantyx-textMuted">
+                    File must be accessible locally on disk with read permissions.
+                  </span>
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAttachMediaSource(null)}
+                  className="rounded border border-vantyx-border px-3 py-1.5 text-vantyx-textSecondary hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={attachingMedia || (attachMode === 'upload' ? !selectedFile : !localPathInput.trim())}
+                  className="flex items-center gap-2 rounded border border-vantyx-accent bg-vantyx-accent px-4 py-1.5 text-black font-semibold hover:bg-vantyx-accentHover disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={attachingMedia ? 'animate-spin' : ''} />
+                  <span>{attachingMedia ? 'Attaching Media...' : 'Associate Media'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------- Creator OAuth & Vault Modal ----------------- */}
+      {selectedManageCreator && (
+        <CreatorOAuthVaultModal
+          creator={selectedManageCreator}
+          isOpen={true}
+          onClose={() => setSelectedManageCreator(null)}
+          onCreatorUpdated={(updated) => {
+            setCreators((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+            setSelectedManageCreator(updated);
+          }}
+        />
       )}
     </div>
   );
